@@ -311,6 +311,7 @@ class GoTrackTracker:
             return None, {"reason": "triangulation_empty", "tri": tri}
 
         # Optional residual filter.
+        residuals_pre = [r.get("max_residual_mm", -1) for r in records]
         if self.max_triangulation_residual_mm > 0.0:
             keep = []
             for r in records:
@@ -319,7 +320,13 @@ class GoTrackTracker:
                     keep.append(r)
             records = keep
         if not records:
-            return None, {"reason": "all_filtered_by_residual"}
+            import numpy as _np
+            arr = _np.asarray(residuals_pre, dtype=float)
+            logger.warning(
+                f"[fuse] all_filtered_by_residual  n_pre={len(residuals_pre)}  "
+                f"min={arr.min():.2f}mm  median={_np.median(arr):.2f}mm  "
+                f"max={arr.max():.2f}mm  thresh={self.max_triangulation_residual_mm:.2f}mm")
+            return None, {"reason": "all_filtered_by_residual", "residuals_mm": residuals_pre}
 
         weights = build_fit_weights_from_triangulation_records(
             records,
