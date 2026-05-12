@@ -338,7 +338,7 @@ def main():
                         help="ZMQ SUB port for prior pose (robot→capture)")
     parser.add_argument("--port-cmd", type=int, default=6892,
                         help="CommandReceiver port for init/start/stop")
-    parser.add_argument("--robot-ip", type=str, default="192.168.0.100",
+    parser.add_argument("--robot-ip", type=str, default="192.168.0.2",
                         help="Robot PC IP for prior_pose SUB")
     args = parser.parse_args()
 

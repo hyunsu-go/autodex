@@ -219,7 +219,13 @@ class GoTrackEngine:
         self.mask_free = mask_free
 
     def _set_iters(self, n: int) -> None:
-        self.model.opts.num_iterations_test = int(n)
+        """GoTrackOpts is a NamedTuple (immutable). Try to replace; fall back
+        to no-op if model rejects assignment (in which case `num_iters` stays at
+        whatever was set at load time)."""
+        try:
+            self.model.opts = self.model.opts._replace(num_iterations_test=int(n))
+        except (AttributeError, TypeError):
+            pass
 
     def process_frame(
         self,
