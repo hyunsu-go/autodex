@@ -148,6 +148,7 @@ class GoTrackDaemon:
 
     def _do_init(self) -> None:
         """Build GoTrackEngine from init payload sent by robot PC."""
+        import cv2  # noqa: F401
         from autodex.perception.gotrack_engine import GoTrackEngine, CameraIntrinsics
         info = self.cmd_receiver.event_info.get("init", {}) or {}
 
@@ -155,13 +156,20 @@ class GoTrackDaemon:
         anchor_bank_path = info["anchor_bank_path"]
         object_id = int(info.get("object_id", 1))
         object_name = info.get("object_name", "object")
-        all_intrinsics = info["intrinsics"]   # {serial: {K (3x3), width, height}}
+        all_intrinsics = info["intrinsics"]   # {serial: {K (3x3), width, height} or with K_orig/K_undist/dist_params}
         all_extrinsics = info["extrinsics"]   # {serial: 4x4 world->cam}
 
         # Init MultiCameraReader for THIS PC's cameras.
         self.reader = MultiCameraReader()
         my_serials = list(self.reader.camera_names)
         logger.info(f"[init] this PC has {len(my_serials)} cameras: {my_serials}")
+
+        # Build undistort maps so we can rectify SHM frames before feeding the
+        # engine (which uses K_undist). Without this, only the cam whose object
+        # happens to be near the image center survives — others fail because of
+        # the distortion mismatch between raw image and K_undist.
+        import cv2 as _cv2
+        self.undistort_maps = {}
 
         cameras: List[CameraIntrinsics] = []
         for s in my_serials:
@@ -173,13 +181,25 @@ class GoTrackDaemon:
             ext = ext.reshape(3, 4) if ext.size == 12 else ext.reshape(4, 4)
             if ext.shape == (3, 4):
                 ext = np.vstack([ext, [0, 0, 0, 1]])
+            # K is K_undist (intrinsics_undistort) — engine works in undistorted space.
+            K_undist = np.asarray(intr["K"], dtype=np.float64).reshape(3, 3)
+            w, h = int(intr["width"]), int(intr["height"])
             cameras.append(CameraIntrinsics(
-                serial=s,
-                K=np.asarray(intr["K"], dtype=np.float64).reshape(3, 3),
-                extrinsic_cw=ext,
-                width=int(intr["width"]),
-                height=int(intr["height"]),
+                serial=s, K=K_undist, extrinsic_cw=ext, width=w, height=h,
             ))
+            # If K_orig + dist available, precompute undistort map.
+            K_orig = intr.get("K_orig")
+            dist = intr.get("dist_params")
+            if K_orig is not None and dist is not None:
+                K_orig = np.asarray(K_orig, dtype=np.float64).reshape(3, 3)
+                dist = np.asarray(dist, dtype=np.float64).reshape(-1)
+                mapx, mapy = _cv2.initUndistortRectifyMap(
+                    K_orig, dist, None, K_undist, (w, h), _cv2.CV_16SC2)
+                self.undistort_maps[s] = (mapx, mapy)
+            else:
+                self.undistort_maps[s] = None  # raw frame passed as-is
+                logger.warning(f"[init] {s}: no K_orig+dist_params, skipping undistort "
+                               "(anchor projection may be off)")
         if not cameras:
             raise RuntimeError("No cameras with calibration on this PC")
 
@@ -230,11 +250,10 @@ class GoTrackDaemon:
                             f"last_fid={last_frame_ids}")
                 last_log_t = now
 
-            # 1. Pull latest frames from SHM. Take whatever fid is currently
-            #    available per cam (no per-cam "newer than last" check — that
-            #    requires all 4 cams to update in the same 5ms window, which is
-            #    near-impossible at 10 FPS). Dedupe at the frame_id level via
+            # 1. Pull latest frames from SHM, undistort to match K_undist that
+            #    the engine uses. Dedupe at the frame_id level via
             #    last_published_frame_id below.
+            import cv2 as _cv2
             images_data = self.reader.get_images(copy=True)
             frames_bgr: Dict[str, np.ndarray] = {}
             min_frame_id: Optional[int] = None
@@ -242,6 +261,9 @@ class GoTrackDaemon:
                 img, fid = images_data.get(s, (None, 0))
                 if img is None or fid <= 0:
                     continue
+                maps = self.undistort_maps.get(s) if hasattr(self, "undistort_maps") else None
+                if maps is not None:
+                    img = _cv2.remap(img, maps[0], maps[1], _cv2.INTER_LINEAR)
                 frames_bgr[s] = img
                 last_frame_ids[s] = fid
                 min_frame_id = fid if min_frame_id is None else min(min_frame_id, fid)

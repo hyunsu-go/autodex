@@ -463,10 +463,13 @@ def main():
                 print(f"[viser] failed to start ({exc}); continuing headless")
                 server, obj_frame = None, None
 
-        # 4) Init GoTrack daemons (port 6892).
+        # 4) Init GoTrack daemons (port 6892). Send K_orig + dist_params too so
+        # the daemon can undistort SHM frames to match the K_undist the engine uses.
         intrinsics_payload = {
             s: {
                 "K": intrinsics_full[s]["K_undist"].tolist(),
+                "K_orig": np.asarray(intrinsics_full[s]["K_orig"]).tolist(),
+                "dist_params": np.asarray(intrinsics_full[s]["dist_params"]).tolist(),
                 "width": int(intrinsics_full[s]["width"]),
                 "height": int(intrinsics_full[s]["height"]),
             }
