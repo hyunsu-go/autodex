@@ -308,9 +308,21 @@ class GoTrackTracker:
         view_counts = [len(v) for v in observations_by_anchor.values()]
         n_multi = sum(1 for c in view_counts if c >= 2)
         if n_multi == 0:
+            # Sample anchor_ids per cam to verify they're canonical bank indices.
+            per_cam_sample = {}
+            for s, p in payloads.items():
+                aids = p.get("anchor_ids")
+                sel = p.get("selected_mask")
+                if aids is not None and sel is not None:
+                    sel_ids = np.asarray(aids)[np.asarray(sel, dtype=bool)]
+                    per_cam_sample[s] = (int(sel_ids.size),
+                                          sel_ids[:5].tolist() if sel_ids.size else [],
+                                          int(sel_ids.min()) if sel_ids.size else -1,
+                                          int(sel_ids.max()) if sel_ids.size else -1)
             logger.warning(f"[fuse] no anchors seen by ≥2 cams: "
                            f"n_anchors={n_anchors} max_views_per_anchor={max(view_counts)} "
                            f"n_payloads={len(payloads)}")
+            logger.warning(f"[fuse]   per-cam (n_selected, first5_ids, min, max): {per_cam_sample}")
 
         tri = triangulate_anchor_observations(
             observations_by_anchor=observations_by_anchor,

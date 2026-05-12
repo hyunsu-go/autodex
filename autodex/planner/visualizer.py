@@ -26,7 +26,7 @@ HAND_URDF = {
     ),
     "inspire_left": (
         os.path.join(_ASSET_ROOT, "inspire_left_description", "xarm_inspire_left.urdf"),
-        os.path.join(_ASSET_ROOT, "inspire_left_description", "xarm_inspire_left.urdf"),
+        os.path.join(_ASSET_ROOT, "inspire_description", "inspire_hand_left.urdf"),
     ),
 }
 
