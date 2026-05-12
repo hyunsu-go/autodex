@@ -24,6 +24,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -332,11 +333,17 @@ class GoTrackEngine:
             if dbg is not None:
                 per_camera_debug[cam] = dbg
 
-        # === DIAG: save crop images to /tmp/gotrack_crops/{frame_idx:06d}/{serial}_{kind}.png ===
+        # === DIAG: save crop images to ~/shared_data/AutoDex/debug/gotrack_crops/{obj}/{session_pid}/{frame:06d}/{serial}_*.png ===
         try:
             import os, cv2 as _cv2
             if self._frame_count < 5:
-                save_dir = f"/tmp/gotrack_crops/{int(frame_index):06d}"
+                home = os.path.expanduser("~")
+                # session_pid groups all crops from this daemon's lifetime (resets on restart).
+                session_id = getattr(self, "_diag_session", None)
+                if session_id is None:
+                    self._diag_session = f"{int(time.time())}_{os.getpid()}"
+                    session_id = self._diag_session
+                save_dir = f"{home}/shared_data/AutoDex/debug/gotrack_crops/{self.obj_name}/{session_id}/{int(frame_index):06d}"
                 os.makedirs(save_dir, exist_ok=True)
                 for s in self.serials:
                     dbg = per_camera_debug.get(s)

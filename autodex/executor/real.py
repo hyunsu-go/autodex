@@ -324,19 +324,24 @@ class RealExecutor:
         lift_pose[2, 3] += lift_height
         self._move_cartesian(lift_pose, vel_scale=1/1.5)
 
-        # 7. Place (descend back down slowly, stop on contact)
+        # 7. Place (descend back down slowly, stop on contact).
+        # Target = 5cm BELOW original grasp height — pushes into ground so that
+        # perception/c2r slack still lets the object meet the table. Relies on
+        # stop_on_stall to halt safely once contact is felt.
         self._log_state("place")
+        place_overshoot = 0.05
+        target_descend = lift_height + place_overshoot
         start_z = self.arm.get_data()["position"][2, 3]
         place_pose = self.arm.get_data()["position"].copy()
-        place_pose[2, 3] -= lift_height
+        place_pose[2, 3] -= target_descend
         self._move_cartesian(place_pose, vel_scale=1/3.0, stop_on_stall=True)
         descended = start_z - self.arm.get_data()["position"][2, 3]
-        if descended < lift_height - 0.005:
-            print(f"[executor] place: stopped early — descended {descended*1000:.1f}mm "
-                  f"of target {lift_height*1000:.0f}mm (contact detected)")
+        if descended < target_descend - 0.005:
+            print(f"[executor] place: stopped on contact — descended {descended*1000:.1f}mm "
+                  f"of target {target_descend*1000:.0f}mm")
         else:
-            print(f"[executor] place: full descent — {descended*1000:.1f}mm "
-                  f"(no contact)")
+            print(f"[executor] place: full descent (no contact!) — {descended*1000:.1f}mm "
+                  f"(target {target_descend*1000:.0f}mm)")
 
         self._log_state("done")
         return s_hand
