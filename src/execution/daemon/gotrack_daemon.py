@@ -204,6 +204,15 @@ class GoTrackDaemon:
             logger.error("[loop] not initialized")
             return
 
+        logger.info(f"[loop] entry: stop_event={self.stop_event.is_set()} "
+                    f"exit_event={self.exit_event.is_set()}")
+        # Defensive: clear stop_event left over from a prior session before we
+        # enter the polling loop. Without this, a stale stop from the previous
+        # run kills this run before it starts.
+        if self.stop_event.is_set():
+            logger.warning("[loop] stop_event was set at entry; clearing")
+            self.stop_event.clear()
+
         my_serials = list(self.engine.cameras.keys())
         last_frame_ids = {s: 0 for s in my_serials}
         last_published_frame_id: Optional[int] = None
