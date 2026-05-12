@@ -166,32 +166,47 @@ class RealExecutor:
         time.sleep(self.dt)
 
     def _move_cartesian(self, target_pose, threshold_t=0.002, threshold_r=0.02,
-                        vel_scale=1.0, stop_on_stall=False, stall_ticks=10):
-        """When stop_on_stall=True, break immediately after `stall_ticks` consecutive
-        no-motion ticks (no clear_error, no recovery). Use for placing-style descent
-        where we want to stop on contact, not push through."""
+                        vel_scale=1.0, stop_on_stall=False,
+                        stall_window=30, stall_min_progress=0.001):
+        """Stall detection is window-based: over the last `stall_window` ticks
+        we must have advanced at least `stall_min_progress` meters (default 1 mm)
+        otherwise we count as stalled. This is robust to xarm position-reading
+        latency/noise on slow descents.
+
+        stop_on_stall=True breaks immediately on stall (placing mode — stop on
+        contact, don't clear_error or retry).
+        """
+        from collections import deque
+
         target_rot = Rotation.from_matrix(target_pose[:3, :3])
-        stall_count = 0
-        prev_pos = None
+        pos_history = deque(maxlen=stall_window)
+        stalled = False
         recovered = False
+        recover_count = 0
         for _ in range(500):
             cur = self.arm.get_data()["position"].copy()
             cur_pos = cur[:3, 3].copy()
-            if prev_pos is not None and np.linalg.norm(cur_pos - prev_pos) < 1e-4:
-                stall_count += 1
-                if stop_on_stall and stall_count >= stall_ticks:
-                    print(f"[executor] stall detected ({stall_count} ticks) — stopping (placing mode)")
+            pos_history.append(cur_pos)
+            # Stall = full window collected and total displacement is small.
+            if len(pos_history) == stall_window:
+                progress = np.linalg.norm(pos_history[-1] - pos_history[0])
+                stalled = (progress < stall_min_progress)
+            if stalled:
+                if stop_on_stall:
+                    print(f"[executor] stall detected (window {stall_window} ticks, "
+                          f"progress {progress*1000:.2f}mm) — stopping (placing mode)")
                     break
-                if stall_count >= 50 and not recovered:
+                if not recovered:
                     print("[executor] stall detected, clearing error...")
                     self.arm.clear_error()
                     recovered = True
-                    stall_count = 0
-                elif stall_count >= 100:
-                    print("[executor] stall after recovery, aborting")
-                    break
-            else:
-                stall_count = 0
+                    pos_history.clear()
+                    stalled = False
+                else:
+                    recover_count += 1
+                    if recover_count >= stall_window:
+                        print("[executor] stall after recovery, aborting")
+                        break
             prev_pos = cur_pos
             t_delta = target_pose[:3, 3] - cur[:3, 3]
             t_dist = np.linalg.norm(t_delta)
@@ -311,9 +326,14 @@ class RealExecutor:
 
         # 7. Place (descend back down slowly, stop on contact)
         self._log_state("place")
-        place_pose = self.arm.get_data()["position"].copy()
+        start_pose = self.arm.get_data()["position"].copy()
+        place_pose = start_pose.copy()
         place_pose[2, 3] -= lift_height
         self._move_cartesian(place_pose, vel_scale=1/3.0, stop_on_stall=True)
+        final_z = self.arm.get_data()["position"][2, 3]
+        print(f"[executor] place: descended {(start_pose[2,3] - final_z)*1000:.1f}mm "
+              f"(target {lift_height*1000:.0f}mm, final link6 z={final_z:.4f}, "
+              f"original grasp z={wrist_ee[2,3]:.4f})")
 
         self._log_state("done")
         return s_hand
@@ -328,7 +348,9 @@ class RealExecutor:
         self._release_auto(pg_hand, g_hand)
 
     def _release_auto(self, pg_hand, g_hand):
-        """Reference: run_auto_v2.py lines 357-375"""
+        """Reverse squeeze -> grasp -> pregrasp, then STOP.
+        Hand opening to hand_init and arm retract back to init are intentionally
+        skipped — user resets those manually after inspecting the placed object."""
         sl = self.squeeze_level
 
         # Reverse squeeze
@@ -340,17 +362,6 @@ class RealExecutor:
         self._move_hand(g_hand)
         time.sleep(0.01)
         self._move_hand(pg_hand)
-        time.sleep(0.01)
-        self._move_hand(self._convert(self._hand_init))
-
-        # Return arm to init
-        execute_order = [1, 2, 5, 0, 3, 4]
-        if self.arm.get_data()["qpos"][1] < self._xarm_init[1]:
-            execute_order = [2, 1, 5, 0, 3, 4]
-
-        clear_view = self._xarm_init.copy()
-        clear_view[0] -= 60 * np.pi / 180
-        self._move_joint_sequential(clear_view[:6], execute_order)
 
     def shutdown(self):
         self.arm.end()

@@ -288,6 +288,12 @@ class GoTrackDaemon:
             prior_frame_id = int(prior.get("frame_id", -1))
 
             # 3. Run GoTrackEngine.
+            # diag: frames_bgr stats per cam (right before engine)
+            if n_published < 3:
+                for _s, _img in frames_bgr.items():
+                    logger.info(f"[diag-frame] {_s}: shape={_img.shape} dtype={_img.dtype} "
+                                f"mean={float(_img.mean()):.2f} std={float(_img.std()):.2f} "
+                                f"nonzero={int((_img != 0).sum())}/{_img.size}")
             t0 = time.perf_counter()
             try:
                 per_cam = self.engine.process_frame(
