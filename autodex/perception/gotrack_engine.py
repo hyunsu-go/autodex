@@ -346,19 +346,21 @@ class GoTrackEngine:
                 continue
             fmap = dbg.get("flow_map")
             cmap = dbg.get("confidence_map")
+            tw = dbg.get("T_world_from_crop_cam")
+            ci = dbg.get("crop_intrinsic")
+            cis = dbg.get("crop_image_size")
             f_stat = (
-                f"flow shape={list(fmap.shape) if hasattr(fmap, 'shape') else None} "
-                f"min={float(fmap.min()):.3f} max={float(fmap.max()):.3f} "
-                f"mean={float(fmap.mean()):.3f}"
+                f"flow shape={list(fmap.shape) if hasattr(fmap, 'shape') else None}"
             ) if hasattr(fmap, "min") else "flow=None"
-            c_stat = (
-                f"conf min={float(cmap.min()):.3f} max={float(cmap.max()):.3f} "
-                f"mean={float(cmap.mean()):.3f}"
-            ) if hasattr(cmap, "min") else "conf=None"
-            id_dbg = id(dbg)
-            id_fmap = id(fmap) if fmap is not None else -1
-            diag_records[s] = (f"status={status} id(dbg)={id_dbg:x} "
-                               f"id(flow)={id_fmap:x} {f_stat} {c_stat}")
+            tw_str = "Tw=None"
+            if tw is not None:
+                t_arr = np.asarray(tw)
+                tw_str = f"Tw=[t={t_arr[:3,3].round(3).tolist()}]"
+            ci_str = "ci=None"
+            if ci is not None:
+                ci_arr = np.asarray(ci)
+                ci_str = f"ci_fx={ci_arr[0,0]:.1f} cx={ci_arr[0,2]:.1f}"
+            diag_records[s] = (f"status={status} {f_stat} {tw_str} {ci_str} cis={cis}")
         logger.info("[engine.diag] per-cam debug after refine batch:")
         for s, txt in diag_records.items():
             logger.info(f"  {s}: {txt}")

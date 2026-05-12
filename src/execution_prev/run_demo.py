@@ -124,7 +124,7 @@ def main():
 
     # Init executor
     print("Initializing executor...")
-    executor = RealExecutor(mode="auto", hand_name=args.hand)
+    executor = RealExecutor(hand_name=args.hand)
 
     # Warmup planner with dummy plan
     print("Warming up planner...")

@@ -446,7 +446,7 @@ def main():
 
     # Executor init (reuse across trials — reference: arm/hand init once)
     print("Initializing executor...")
-    executor = RealExecutor(mode="auto", hand_name=args.hand)
+    executor = RealExecutor(hand_name=args.hand)
 
     def _cleanup():
         print("\n[cleanup] Stopping hardware...")

@@ -246,7 +246,7 @@ def main():
         # ── 4. GUI execute ───────────────────────────────────────────────────
         print(f"[4/4] Launching GUI executor...")
         timing["execution_start"] = _ts()
-        executor = RealExecutor(mode="gui", hand_name=args.hand)
+        executor = RealExecutor(hand_name=args.hand)
         s_hand = executor.execute(result)
         timing["execution_states"] = executor.state_timestamps
 

@@ -271,7 +271,7 @@ def main():
     timing["execution_start"] = _ts()
 
     from autodex.executor.real import RealExecutor
-    executor = RealExecutor(mode="gui", hand_name=args.hand)
+    executor = RealExecutor(hand_name=args.hand)
     s_hand = executor.execute(result)
     timing["execution_states"] = executor.state_timestamps
 

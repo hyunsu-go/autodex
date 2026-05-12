@@ -393,7 +393,7 @@ def main():
     print("[planner] warming up...")
     planner = GraspPlanner(hand=args.hand)
     print("[executor] connecting to robot...")
-    executor = RealExecutor(mode="auto", hand_name=args.hand)
+    executor = RealExecutor(hand_name=args.hand)
 
     def _cleanup():
         print("\n[cleanup] Stopping hardware...")
