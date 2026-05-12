@@ -346,16 +346,28 @@ class GoTrackTracker:
     ) -> Iterator[Tuple[int, np.ndarray, Dict[str, Any]]]:
         """Generator: yield (frame_id, pose_world, info) every frame."""
         # Send initial prior so daemons can start processing.
-        self.publish_prior(init_pose_world, frame_id=-1)
+        # Burst-publish to defeat ZMQ slow-joiner: SUBs that connect before the
+        # PUB binds (e.g. daemons) miss messages sent at startup. CONFLATE=1
+        # on the subscriber side means only the latest survives, so it's safe
+        # to spam.
+        for _ in range(20):
+            self.publish_prior(init_pose_world, frame_id=-1)
+            time.sleep(0.02)
         prev_pose = init_pose_world.astype(np.float64).copy()
         with self._status_lock:
             self.status["init_done"] = True
             self.status["init_ts"] = time.time()
             self.status["current_pose"] = prev_pose.tolist()
 
+        last_idle_republish = time.time()
         while not self._stop.is_set():
             ready = self.sync_buffer.pop_ready()
             if ready is None:
+                # While idle waiting for first obs, keep republishing the prior
+                # every 0.5s in case daemons missed earlier broadcasts.
+                if time.time() - last_idle_republish > 0.5:
+                    self.publish_prior(prev_pose, frame_id=-1)
+                    last_idle_republish = time.time()
                 time.sleep(0.005)
                 continue
             frame_id, payloads = ready

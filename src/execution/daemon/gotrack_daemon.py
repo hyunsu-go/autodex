@@ -221,24 +221,29 @@ class GoTrackDaemon:
                             f"last_fid={last_frame_ids}")
                 last_log_t = now
 
-            # 1. Pull latest frames from SHM.
+            # 1. Pull latest frames from SHM. Take whatever fid is currently
+            #    available per cam (no per-cam "newer than last" check — that
+            #    requires all 4 cams to update in the same 5ms window, which is
+            #    near-impossible at 10 FPS). Dedupe at the frame_id level via
+            #    last_published_frame_id below.
             images_data = self.reader.get_images(copy=True)
             frames_bgr: Dict[str, np.ndarray] = {}
             min_frame_id: Optional[int] = None
             for s in my_serials:
                 img, fid = images_data.get(s, (None, 0))
-                if img is None or fid <= last_frame_ids[s] or fid <= 0:
+                if img is None or fid <= 0:
                     continue
                 frames_bgr[s] = img
                 last_frame_ids[s] = fid
                 min_frame_id = fid if min_frame_id is None else min(min_frame_id, fid)
 
-            # Need all cams synced; if any cam missing this iteration, wait.
+            # Need all cams to have at least some valid frame.
             if len(frames_bgr) != len(my_serials):
                 n_skipped_frames += 1
                 time.sleep(0.005)
                 continue
             if min_frame_id == last_published_frame_id:
+                time.sleep(0.005)
                 continue
 
             # 2. Get latest prior pose. Skip if none yet (robot PC hasn't sent
