@@ -22,7 +22,7 @@ from autodex.utils.path import robot_configs_path, load_candidate
 from autodex.utils.conversion import se32action, cart2se3
 from autodex.utils.robot_config import (
     INIT_STATE, XARM_INIT, INSPIRE_INIT,
-    ALLEGRO_LINK6_TO_WRIST, INSPIRE_LINK6_TO_WRIST,
+    ALLEGRO_LINK6_TO_WRIST, INSPIRE_LINK6_TO_WRIST, INSPIRE_LEFT_LINK6_TO_WRIST,
 )
 
 
@@ -116,9 +116,12 @@ class GraspPlanner:
         self._ik_solver: Optional[IKSolver] = None
 
         # Init state: same arm position for all hands, hand-specific finger init
-        if hand in ("inspire", "inspire_left"):
+        if hand == "inspire":
             self._init_state = np.concatenate([XARM_INIT, INSPIRE_INIT]).astype(np.float32)
             self._link6_to_wrist_rot = INSPIRE_LINK6_TO_WRIST[:3, :3]
+        elif hand == "inspire_left":
+            self._init_state = np.concatenate([XARM_INIT, INSPIRE_INIT]).astype(np.float32)
+            self._link6_to_wrist_rot = INSPIRE_LEFT_LINK6_TO_WRIST[:3, :3]
         else:
             self._init_state = INIT_STATE.astype(np.float32)
             self._link6_to_wrist_rot = ALLEGRO_LINK6_TO_WRIST[:3, :3]

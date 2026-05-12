@@ -24,7 +24,7 @@ from autodex.planner import PlanResult
 from autodex.utils.robot_config import (
     XARM_INIT, XARM_INSPIRE_INIT,
     ALLEGRO_INIT, ALLEGRO_LINK6_TO_WRIST,
-    INSPIRE_INIT, INSPIRE_LINK6_TO_WRIST,
+    INSPIRE_INIT, INSPIRE_LINK6_TO_WRIST, INSPIRE_LEFT_LINK6_TO_WRIST,
 )
 
 # Per-hand config: (init_joints, link6_to_wrist, convert_fn)
@@ -86,7 +86,7 @@ HAND_CONFIG = {
     },
     "inspire_left": {
         "init": INSPIRE_INIT,
-        "link6_to_wrist": INSPIRE_LINK6_TO_WRIST,
+        "link6_to_wrist": INSPIRE_LEFT_LINK6_TO_WRIST,
         "convert": _convert_inspire,
         "xarm_init": XARM_INSPIRE_INIT,
     },

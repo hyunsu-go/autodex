@@ -378,7 +378,7 @@ class InitOrchestrator:
             antialias=True,
         )
         t_sil = time.perf_counter() - t_sil0
-        logger.info(f"[orch] sil refine: {t_sil:.2f}s ({sil_iters} iters)")
+        logger.info(f"[orch] sil refine: {t_sil:.2f}s ({sil_iters} iters, loss={sil_loss:.6f})")
 
         timing = {
             "dispatch_to_collected_s": t_collected - t_dispatch,
@@ -395,6 +395,15 @@ class InitOrchestrator:
             "pre_sil_pose": np.asarray(best_pose, dtype=np.float64).tolist(),
         }
         self.mask_buf.drop(request_id); self.pose_buf.drop(request_id)
+
+        # Threshold: silhouette matching loss > 0.003 means the refined pose is
+        # unreliable. Carried over from legacy perception_pipeline.py:320-322.
+        if sil_loss > 0.003:
+            logger.warning(f"[orch] sil loss {sil_loss:.6f} > 0.003 — pose unreliable, skipping")
+            timing["sil_reject"] = True
+            timing["reason"] = f"sil_loss_too_high ({sil_loss:.6f})"
+            return None, timing
+
         return np.asarray(refined, dtype=np.float64), timing
 
     def close(self) -> None:

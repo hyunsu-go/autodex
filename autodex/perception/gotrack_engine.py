@@ -332,6 +332,37 @@ class GoTrackEngine:
             if dbg is not None:
                 per_camera_debug[cam] = dbg
 
+        # === DIAG: per-cam debug state right after batch refinement ===
+        diag_records: Dict[str, str] = {}
+        for s in self.serials:
+            rec = per_camera_records.get(s)
+            dbg = per_camera_debug.get(s)
+            if rec is None:
+                diag_records[s] = "rec=None"
+                continue
+            status = rec.get("status", "?")
+            if dbg is None:
+                diag_records[s] = f"status={status} dbg=None"
+                continue
+            fmap = dbg.get("flow_map")
+            cmap = dbg.get("confidence_map")
+            f_stat = (
+                f"flow shape={list(fmap.shape) if hasattr(fmap, 'shape') else None} "
+                f"min={float(fmap.min()):.3f} max={float(fmap.max()):.3f} "
+                f"mean={float(fmap.mean()):.3f}"
+            ) if hasattr(fmap, "min") else "flow=None"
+            c_stat = (
+                f"conf min={float(cmap.min()):.3f} max={float(cmap.max()):.3f} "
+                f"mean={float(cmap.mean()):.3f}"
+            ) if hasattr(cmap, "min") else "conf=None"
+            id_dbg = id(dbg)
+            id_fmap = id(fmap) if fmap is not None else -1
+            diag_records[s] = (f"status={status} id(dbg)={id_dbg:x} "
+                               f"id(flow)={id_fmap:x} {f_stat} {c_stat}")
+        logger.info("[engine.diag] per-cam debug after refine batch:")
+        for s, txt in diag_records.items():
+            logger.info(f"  {s}: {txt}")
+
         external_unit_scale_to_meter = float(self._unit_info.external_unit_scale_to_meter)
         per_view_anchor_data, _obs_by_anchor, _summary = _build_anchor_observations_for_frame(
             anchor_bank=self.anchor_bank,
@@ -342,6 +373,24 @@ class GoTrackEngine:
             args=self.args,
             external_unit_scale_to_meter=external_unit_scale_to_meter,
         )
+
+        # === DIAG: per-cam valid_mask after anchor obs build ===
+        logger.info("[engine.diag] per-cam anchor obs:")
+        for s in self.serials:
+            obs = per_view_anchor_data.get(s)
+            if obs is None:
+                logger.info(f"  {s}: obs=None")
+                continue
+            vm = obs.get("valid_mask")
+            sm = obs.get("selected_mask")
+            conf = obs.get("confidence")
+            v_sum = int(np.asarray(vm).sum()) if vm is not None else -1
+            s_sum = int(np.asarray(sm).sum()) if sm is not None else -1
+            c_stat = ""
+            if conf is not None:
+                ca = np.asarray(conf)
+                c_stat = f"conf[min={ca.min():.3f} max={ca.max():.3f} mean={ca.mean():.3f}]"
+            logger.info(f"  {s}: valid={v_sum}/256 selected={s_sum} {c_stat}")
         compute_sec = _time.perf_counter() - t0
         self._frame_count += 1
 
