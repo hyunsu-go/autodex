@@ -246,7 +246,20 @@ def _build_viser(mesh_path: Path,
         r2c = np.linalg.inv(np.asarray(c2r, dtype=np.float64).reshape(4, 4))
 
     server = viser.ViserServer(port=port)
-    server.scene.add_frame("/world", show_axes=True, axes_length=0.1, axes_radius=0.003)
+    # Robot base origin frame (longer axes so it's clearly visible).
+    server.scene.add_frame("/world", show_axes=True, axes_length=0.2, axes_radius=0.005)
+    # Floor grid (z=0 in robot frame == table plane).
+    try:
+        server.scene.add_grid(
+            "/floor",
+            width=2.0, height=2.0,
+            width_segments=20, height_segments=20,
+            plane="xy",
+            cell_color=(160, 160, 160),
+            section_color=(80, 80, 80),
+        )
+    except Exception:
+        pass
 
     obj_frame = server.scene.add_frame("/object", show_axes=True,
                                         axes_length=0.05, axes_radius=0.002)
