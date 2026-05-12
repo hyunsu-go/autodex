@@ -13,7 +13,7 @@ PCS=(capture1 capture2 capture3 capture5 capture6)  # capture4 out
 PY='$HOME/anaconda3/envs/gotrack_cu128/bin/python'
 DAEMON='$HOME/AutoDex/src/execution/daemon/gotrack_daemon.py'
 LOG=/tmp/gotrack_daemon.log
-ROBOT_IP="${ROBOT_IP:-192.168.0.100}"
+ROBOT_IP="${ROBOT_IP:-192.168.0.2}"
 
 ACTION="${1:-status}"
 
