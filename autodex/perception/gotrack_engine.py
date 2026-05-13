@@ -400,10 +400,12 @@ class GoTrackEngine:
                     a = _cv2.cvtColor(a, _cv2.COLOR_RGB2BGR)
                 return a
 
+            bboxes: Dict[str, list] = {}
             for s in self.serials:
                 dbg = per_camera_debug.get(s)
                 if dbg is None:
                     continue
+                # crops
                 for key, suffix in (("query_rgb_crop", "query"),
                                     ("template_rgb_crop", "template")):
                     arr = dbg.get(key)
@@ -413,6 +415,47 @@ class GoTrackEngine:
                         self._crop_save_q.put_nowait((f"{save_dir}/{s}_{suffix}.png", _prep(arr)))
                     except _q.Full:
                         self._crop_save_drops += 1
+                # downscaled full frame (undistorted) as JPG — 1/4 scale
+                frame = frames_bgr.get(s)
+                if frame is not None:
+                    try:
+                        h, w = frame.shape[:2]
+                        small = _cv2.resize(frame, (w // 4, h // 4),
+                                            interpolation=_cv2.INTER_AREA)
+                        try:
+                            self._crop_save_q.put_nowait((f"{save_dir}/{s}_frame.jpg", small))
+                        except _q.Full:
+                            self._crop_save_drops += 1
+                    except Exception:
+                        pass
+                # 4-corner bbox in original undistorted image coords. Same-position
+                # rotation only: ray dir in crop_cam → rotate to world → rotate to
+                # orig_cam → project. Robust to depth.
+                ci = dbg.get("crop_intrinsic")
+                Tw_crop = dbg.get("T_world_from_crop_cam")
+                Tw_orig = dbg.get("T_world_from_orig_cam")
+                if ci is not None and Tw_crop is not None and Tw_orig is not None:
+                    K_crop = np.asarray(ci, dtype=np.float64)
+                    R_wc = np.asarray(Tw_crop, dtype=np.float64)[:3, :3]
+                    R_wo = np.asarray(Tw_orig, dtype=np.float64)[:3, :3]
+                    K_orig = np.asarray(self.cameras[s].K, dtype=np.float64)
+                    cw, ch = 280, 280  # crop size; matches model.opts.crop_size
+                    corners_crop = np.array([
+                        [0, 0, 1], [cw, 0, 1], [cw, ch, 1], [0, ch, 1],
+                    ], dtype=np.float64)
+                    rays_crop = (np.linalg.inv(K_crop) @ corners_crop.T).T
+                    rays_world = (R_wc @ rays_crop.T).T
+                    rays_orig = (R_wo.T @ rays_world.T).T
+                    uv_orig = (K_orig @ rays_orig.T).T
+                    uv_orig = uv_orig[:, :2] / uv_orig[:, 2:3]
+                    bboxes[str(s)] = uv_orig.round(2).tolist()
+            if bboxes:
+                try:
+                    import json
+                    with open(f"{save_dir}/bbox.json", "w") as fh:
+                        json.dump(bboxes, fh)
+                except Exception:
+                    pass
         except Exception as exc:
             logger.warning(f"[diag-crops] enqueue failed: {exc}")
 
