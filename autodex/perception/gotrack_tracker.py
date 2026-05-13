@@ -368,12 +368,12 @@ class GoTrackTracker:
             inlier_threshold_mm=self.kabsch_inlier_thresh_mm,
             external_unit_scale_to_meter=self.external_unit_scale_to_meter,
         )
-        pose_world = fit.get("pose_world")
+        pose_world = fit.get("pose_world_from_object")
         if pose_world is None:
             return None, {"reason": "fit_failed", "fit": fit}
         return np.asarray(pose_world, dtype=np.float64), {
             "n_triangulated": len(records),
-            "n_inliers": int(fit.get("num_inliers", 0)),
+            "n_inliers": int(fit.get("num_inlier_anchors", 0)),
             "mean_residual_mm": float(fit.get("mean_residual_mm", -1)),
             "fit": fit,
         }
