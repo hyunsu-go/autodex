@@ -26,8 +26,7 @@ import cv2
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ASSETS_ROOT = Path.home() / "shared_data/AutoDex/content/assets/object/paradex"
-MESH_BASE = ASSETS_ROOT
+MESH_BASE = Path.home() / "shared_data/AutoDex/object/paradex"
 
 
 def _resolve_mesh(obj_name: str) -> Path:
