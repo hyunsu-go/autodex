@@ -419,7 +419,8 @@ class GoTrackEngine:
                 ci_arr = np.asarray(ci)
                 ci_str = f"ci_fx={ci_arr[0,0]:.1f} cx={ci_arr[0,2]:.1f}"
             diag_records[s] = (f"status={status} {f_stat} {tw_str} {ci_str} cis={cis}")
-        logger.info("[engine.diag] per-cam debug after refine batch:")
+        engine_sec = _time.perf_counter() - t0
+        logger.info(f"[engine.diag] fid={int(frame_index)} engine_sec={engine_sec:.3f} per-cam debug after refine batch:")
         for s, txt in diag_records.items():
             logger.info(f"  {s}: {txt}")
 
@@ -435,7 +436,7 @@ class GoTrackEngine:
         )
 
         # === DIAG: per-cam valid_mask after anchor obs build ===
-        logger.info("[engine.diag] per-cam anchor obs:")
+        logger.info(f"[engine.diag] fid={int(frame_index)} per-cam anchor obs:")
         for s in self.serials:
             obs = per_view_anchor_data.get(s)
             if obs is None:
