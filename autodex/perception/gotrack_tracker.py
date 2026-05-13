@@ -421,6 +421,16 @@ class GoTrackTracker:
                 if dt > 0:
                     fps = (len(self._fps_window) - 1) / dt
             with self._status_lock:
+                counts = self.status.setdefault("counts", {
+                    "received": 0, "success": 0,
+                    "fail_by_reason": {},
+                })
+                counts["received"] += 1
+                if pose_world is not None:
+                    counts["success"] += 1
+                else:
+                    reason = str(info.get("reason", "unknown"))
+                    counts["fail_by_reason"][reason] = counts["fail_by_reason"].get(reason, 0) + 1
                 self.status["frame_id"] = int(frame_id)
                 self.status["fps"] = float(fps)
                 self.status["last_fit_ok"] = pose_world is not None

@@ -523,15 +523,23 @@ def main():
             n = 0
             t_start = time.perf_counter()
             print(f"[track-worker] entered _run, calling tracker.track(...)")
-            # Background watchdog: every 2s report buffer / per-PC obs counts.
+            # Background watchdog: every 2s report received / success / fail
+            # breakdown so failures are visible. n_yielded alone is meaningless
+            # — pair it with received count + per-reason fail counts.
             def _watchdog():
                 while not keyboard.stop_event.is_set():
                     time.sleep(2.0)
                     with tracker._status_lock:
                         per_pc = dict(tracker.status.get("per_pc_last_frame", {}))
+                        counts = dict(tracker.status.get("counts", {}))
+                    received = int(counts.get("received", 0))
+                    success = int(counts.get("success", 0))
+                    fail_by = dict(counts.get("fail_by_reason", {}))
                     n_inflight = len(tracker.sync_buffer._buf)
-                    print(f"[track-worker:watchdog] n_yielded={n} "
-                          f"sync_buffer_inflight={n_inflight} "
+                    rate = (success / received * 100.0) if received else 0.0
+                    fail_str = ", ".join(f"{k}={v}" for k, v in sorted(fail_by.items())) or "-"
+                    print(f"[track-worker:watchdog] received={received} success={success} "
+                          f"({rate:.1f}%) fails[{fail_str}] inflight={n_inflight} "
                           f"per_pc_last_fid={ {ip: v.get('frame_id') for ip, v in per_pc.items()} }")
             threading.Thread(target=_watchdog, daemon=True).start()
             try:
