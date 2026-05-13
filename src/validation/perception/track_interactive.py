@@ -482,22 +482,6 @@ def main():
                   f"sil_loss={init_timing.get('sil_loss', 0):.4f})")
             init_timing["source"] = "foundpose_init"
 
-        # Save cam_param so build_track_video.py can render pose overlay on
-        # the saved per-fid frames without re-loading the calib dir.
-        cam_param_dir = trial_dir / "cam_param"
-        cam_param_dir.mkdir(parents=True, exist_ok=True)
-        with open(cam_param_dir / "intrinsics.json", "w") as f:
-            json.dump({s: {
-                "K_undist": np.asarray(v["K_undist"]).tolist(),
-                "K_orig": np.asarray(v["K_orig"]).tolist(),
-                "dist_params": np.asarray(v["dist_params"]).tolist(),
-                "width": int(v["width"]),
-                "height": int(v["height"]),
-            } for s, v in intrinsics_full.items()}, f, indent=2)
-        with open(cam_param_dir / "extrinsics.json", "w") as f:
-            json.dump({s: np.asarray(v).reshape(4, 4).tolist()
-                       for s, v in extrinsics_full.items()}, f, indent=2)
-
         # Save C2R (world/charuco -> robot base) into trial dir + convert init pose.
         from paradex.calibration.utils import save_current_C2R, load_c2r
         save_current_C2R(str(trial_dir))

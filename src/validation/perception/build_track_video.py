@@ -57,13 +57,14 @@ def _load_pose_log(trial_dir: Path) -> Dict[int, Dict]:
     return {int(rec["frame_id"]): rec for rec in log}
 
 
-def _load_cam_params(trial_dir: Path) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], int, int]:
-    """Returns K_undist per serial, extrinsic_cw per serial, H, W (originals)."""
-    intr_path = trial_dir / "cam_param" / "intrinsics.json"
-    extr_path = trial_dir / "cam_param" / "extrinsics.json"
+def _load_cam_params(calib_dir: Path) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], int, int]:
+    """Returns K_undist per serial, extrinsic_cw per serial, H, W (originals).
+    Reads the system calib dir layout (intrinsics_undistort / original_intrinsics)."""
+    intr_path = calib_dir / "intrinsics.json"
+    extr_path = calib_dir / "extrinsics.json"
     intr_raw = json.loads(intr_path.read_text())
     extr_raw = json.loads(extr_path.read_text())
-    K = {s: np.asarray(v["K_undist"], dtype=np.float64) for s, v in intr_raw.items()}
+    K = {s: np.asarray(v["intrinsics_undistort"], dtype=np.float64) for s, v in intr_raw.items()}
     T = {}
     for s, v in extr_raw.items():
         e = np.asarray(v, dtype=np.float64)
@@ -94,8 +95,8 @@ def _render_overlay(image_rgb: np.ndarray, pose_world: np.ndarray,
     return out
 
 
-def build_video(crops_dir: Path, trial_dir: Path, mesh_path: Path, out_path: Path,
-                fps: int = 10) -> None:
+def build_video(crops_dir: Path, trial_dir: Path, calib_dir: Path,
+                mesh_path: Path, out_path: Path, fps: int = 10) -> None:
     fids = _list_fids(crops_dir)
     if not fids:
         raise SystemExit(f"no fids in {crops_dir}")
@@ -103,7 +104,7 @@ def build_video(crops_dir: Path, trial_dir: Path, mesh_path: Path, out_path: Pat
     if not serials:
         raise SystemExit(f"no frames in {crops_dir}")
     pose_log = _load_pose_log(trial_dir)
-    K_orig_all, T_all, H_orig, W_orig = _load_cam_params(trial_dir)
+    K_orig_all, T_all, H_orig, W_orig = _load_cam_params(calib_dir)
 
     sample = cv2.imread(str(next(crops_dir.glob(f"{fids[0]:06d}/*_frame.jpg"))))
     if sample is None:
@@ -183,6 +184,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--trial-dir", required=True)
     ap.add_argument("--crops-root", default="~/shared_data/AutoDex/debug/gotrack_crops")
+    ap.add_argument("--calib-dir", default=None,
+                    help="Defaults to latest dir under ~/shared_data/cam_param/")
     ap.add_argument("--obj", required=True)
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--out", default=None)
@@ -190,9 +193,15 @@ def main() -> None:
 
     trial_dir = Path(args.trial_dir).expanduser()
     crops_dir = Path(args.crops_root).expanduser() / args.obj
+    if args.calib_dir:
+        calib_dir = Path(args.calib_dir).expanduser()
+    else:
+        cam_root = Path.home() / "shared_data/cam_param"
+        calib_dir = sorted(cam_root.iterdir())[-1]
+    print(f"[calib] {calib_dir}")
     mesh_path = _resolve_mesh(args.obj)
     out = Path(args.out).expanduser() if args.out else trial_dir / "track_debug.mp4"
-    build_video(crops_dir, trial_dir, mesh_path, out, fps=args.fps)
+    build_video(crops_dir, trial_dir, calib_dir, mesh_path, out, fps=args.fps)
 
 
 if __name__ == "__main__":
