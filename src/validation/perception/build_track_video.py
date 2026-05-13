@@ -83,6 +83,13 @@ def _load_cam_params(calib_dir: Path) -> Tuple[Dict[str, np.ndarray], Dict[str, 
     return K, T, int(sample["height"]), int(sample["width"])
 
 
+def _draw_bbox(img: np.ndarray, corners_orig: List[List[float]],
+               scale: float, color=(0, 0, 255), thickness=2) -> None:
+    pts = np.asarray(corners_orig, dtype=np.float32) * scale
+    pts = pts.round().astype(np.int32).reshape(-1, 1, 2)
+    cv2.polylines(img, [pts], isClosed=True, color=color, thickness=thickness)
+
+
 def _render_overlay(image_rgb: np.ndarray, pose_world: np.ndarray,
                     K: np.ndarray, T: np.ndarray, H: int, W: int,
                     glctx, mt, color=(0, 200, 0), alpha=0.5) -> np.ndarray:
