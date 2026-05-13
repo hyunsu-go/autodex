@@ -51,11 +51,18 @@ def _collect_serials(crops_dir: Path, fids: List[int]) -> List[str]:
 
 
 def _load_pose_log(trial_dir: Path) -> Dict[int, Dict]:
-    path = trial_dir / "pose_log.json"
+    """track_interactive saves {trial_dir}/track_log.json with shape
+    {"obj":..., "trial_ts":..., "frames": [{frame_id, n_inliers,
+    mean_residual_mm, pose_world, ...}, ...]}."""
+    path = trial_dir / "track_log.json"
     if not path.exists():
-        return {}
-    log = json.loads(path.read_text())
-    return {int(rec["frame_id"]): rec for rec in log}
+        # Backwards-compat alt name.
+        path = trial_dir / "pose_log.json"
+        if not path.exists():
+            return {}
+    data = json.loads(path.read_text())
+    frames = data.get("frames", data) if isinstance(data, dict) else data
+    return {int(rec["frame_id"]): rec for rec in frames}
 
 
 def _load_cam_params(calib_dir: Path) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], int, int]:
