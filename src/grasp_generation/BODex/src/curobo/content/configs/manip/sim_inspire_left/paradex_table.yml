@@ -1,21 +1,6 @@
 world:
   type: paradex
-  obj_list : [
-    "blue_alarm",
-    "organizer_beige",
-    "pepsi",
-    "attached_container",
-    "knife_sharpner",
-    "pringles",
-    "pepper_tuna",
-    "soaptray",
-    "potato_mesher",
-    "bamboo_box",
-    "icecream_scoop",
-    "donut",
-    "banana",
-    "white_hand_shower"
-  ]
+  obj_list : []
   scene_type : ["table"]
 
 robot_file: "inspire_left.yml"
@@ -25,7 +10,7 @@ particle_file: "particle_grasp_debug.yml"
 gradient_file: "gradient_grasp_fc.yml"
 
 exp_name: 'table_only'
-seed_num: 200
+seed_num: 100
 seeder_cfg:
   obj_sample:
     num: 1024
