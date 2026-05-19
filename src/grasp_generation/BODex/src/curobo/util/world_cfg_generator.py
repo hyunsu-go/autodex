@@ -75,8 +75,8 @@ class WorldConfigDataset(Dataset):
 
 class ParadexDataset(Dataset):
     def __init__(self, obj_list=[], scene_type_list=[], batch_size=1, version="", seed_offset=0, output_dir=None, obj_root_dir=None):
-        home_dir = os.path.expanduser("~")
-        self.obj_root_dir = obj_root_dir or os.path.join(home_dir, "shared_data", "RSS2026_Mingi", "object", "paradex")
+        from autodex.utils.path import obj_path as _autodex_obj_path
+        self.obj_root_dir = obj_root_dir or _autodex_obj_path
         self.output_dir = output_dir
 
         self.obj_list = obj_list if len(obj_list) != 0 else os.listdir(self.obj_root_dir)

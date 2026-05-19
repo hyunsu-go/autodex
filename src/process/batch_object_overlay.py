@@ -191,9 +191,20 @@ def run_gotrack(local_ep, nas_ep, obj_name, local_gt_out, track_cams, frame_pbar
         "--mask-free",
         "--unit-scale-mode", "meters_to_mm",
         "--disable-all-view-post-visualization",
+        # Defaults from canonical reference shell:
+        # autodex/perception/thirdparty/MV-GoTrack/scripts/examples/run_0413_mingi_multiview_gotrack_anchor_online.sh
+        "--skip-pnp",
+        "--template-renderer-backend", "nvdiffrast",
+        "--optimized-input-pipeline-v2",
+        "--optim-crop-update-interval", "0",
+        "--optim-template-update-interval", "2",
+        "--optim-template-render-workers", "1",
+        "--optim-v2-crop-camera-workers", "4",
+        "--optim-v2-warp-grid-workers", "4",
+        "--input-resize-scale", "0.5",
     ]
     env = dict(os.environ)
-    env["GOTRACK_RENDER_BACKEND"] = "pyglet"
+    env["GOTRACK_VISUALIZATION_RENDERER_BACKEND"] = "nvdiffrast"
     env["PYTHONUNBUFFERED"] = "1"
 
     t0 = time.time()

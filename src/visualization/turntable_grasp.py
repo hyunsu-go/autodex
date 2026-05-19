@@ -49,6 +49,10 @@ HAND_URDF = {
         repo_dir, "autodex", "planner", "src", "curobo", "content", "assets",
         "robot", "inspire_description", "inspire_hand_left.urdf",
     ),
+    "inspire_f1_left": os.path.join(
+        repo_dir, "autodex", "planner", "src", "curobo", "content", "assets",
+        "robot", "inspire_f1_left_description", "inspire_f1_hand_left.urdf",
+    ),
 }
 
 # These globals are set in main() based on --hand
@@ -401,7 +405,7 @@ def render_object_only(obj_name, output_path, args):
 
 def main():
     parser = argparse.ArgumentParser(description="Turntable rendering of grasp candidates")
-    parser.add_argument("--hand", type=str, default="allegro", choices=["allegro", "inspire", "inspire_f1", "inspire_left"],
+    parser.add_argument("--hand", type=str, default="allegro", choices=["allegro", "inspire", "inspire_f1", "inspire_left", "inspire_f1_left"],
                         help="Hand type (default: allegro)")
     parser.add_argument("--obj-root", type=str, default=None,
                         help="Override object mesh root (default: autodex.utils.path.obj_path)")

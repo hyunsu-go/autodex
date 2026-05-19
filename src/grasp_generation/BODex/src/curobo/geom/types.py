@@ -263,7 +263,7 @@ class Obstacle:
 
         normal = sample_mesh.face_normals[face_index]
         if return_radius:
-            p = np.concatenate((p, 0.9 * inflate * np.ones((p.shape[0], 1))), axis=-1)
+            p = np.concatenate((p, np.zeros((p.shape[0], 1))), axis=-1)
             return p, normal
         else:
             return p, normal

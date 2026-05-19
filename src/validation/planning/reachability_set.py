@@ -36,8 +36,13 @@ from autodex.utils.path import obj_path
 from autodex.utils.conversion import se32cart
 
 
-def load_tabletop_scene(obj_name, pose_idx="000", x_offset=0.4, z_rotation=0.0):
-    """Load object pose with configurable x offset and z rotation."""
+def load_tabletop_scene(obj_name, pose_idx="000", r=0.4, theta=0.0):
+    """Load object pose at polar (r, theta) around the xarm base.
+
+    Position    : Rz(theta) @ (tabletop_t + [r, 0, 0])
+    Orientation : tabletop_pose_rotation (NOT rotated — every object faces the
+                  same global direction; we only orbit the position).
+    """
     pose_dir = os.path.join(obj_path, obj_name, "processed_data", "info", "tabletop")
     pose_file = os.path.join(pose_dir, f"{pose_idx}.npy")
     if not os.path.exists(pose_file):
@@ -45,12 +50,11 @@ def load_tabletop_scene(obj_name, pose_idx="000", x_offset=0.4, z_rotation=0.0):
         raise FileNotFoundError(f"Pose {pose_idx} not found. Available: {available}")
 
     obj_pose = np.load(pose_file)
-    obj_pose[0, 3] += x_offset
 
-    if z_rotation != 0.0:
-        c, s = np.cos(z_rotation), np.sin(z_rotation)
-        Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-        obj_pose[:3, :3] = Rz @ obj_pose[:3, :3]
+    obj_pose[0, 3] += r
+    c, s = np.cos(theta), np.sin(theta)
+    Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    obj_pose[:3, 3] = Rz @ obj_pose[:3, 3]
 
     mesh_path = os.path.join(obj_path, obj_name, "processed_data", "mesh", "simplified.obj")
 
@@ -65,6 +69,11 @@ def load_tabletop_scene(obj_name, pose_idx="000", x_offset=0.4, z_rotation=0.0):
             "table": {
                 "dims": [2, 3, 0.2],
                 "pose": [1.1, 0, -0.1 + 0.037, 1, 0, 0, 0],
+            },
+            # Floor everywhere outside the table — prevents arm from reaching below z=0.
+            "floor": {
+                "dims": [10.0, 10.0, 0.05],
+                "pose": [0.0, 0.0, -0.025, 1, 0, 0, 0],
             },
         },
     }
@@ -90,61 +99,70 @@ def get_all_objects():
 
 
 def run_reachability(obj_name, grasp_version, n_trials,
-                     x_offsets, z_rotations_deg, save_dir=None):
-    """IK reachability grid search for one object."""
+                     radii, thetas_deg, save_dir=None, hand="allegro"):
+    """IK reachability polar grid search for one object."""
     pose_indices = get_tabletop_poses(obj_name)
     if not pose_indices:
         print(f"  No tabletop poses found for {obj_name}")
         return None
 
     print(f"Object: {obj_name}")
+    print(f"Hand: {hand}")
     print(f"Grasp version: {grasp_version}")
     print(f"Poses: {pose_indices}")
-    print(f"X offsets: {x_offsets}")
-    print(f"Z rotations: {z_rotations_deg}°")
+    print(f"Radii (m): {radii}")
+    print(f"Thetas (deg): {thetas_deg}")
     print(f"Trials per grid point: {n_trials}")
-    total_points = len(pose_indices) * len(x_offsets) * len(z_rotations_deg)
+    total_points = len(pose_indices) * len(radii) * len(thetas_deg)
     print(f"Total grid points: {total_points}")
     print("=" * 60)
 
     # Suppress cuRobo warnings during batch IK
     logging.getLogger("curobo").setLevel(logging.ERROR)
 
-    planner = GraspPlanner()
+    planner = GraspPlanner(hand=hand)
 
     grid_results = []
     viz_data = []
 
     # Build grid points
-    grid_points = [(p, x, z) for p in pose_indices for x in x_offsets for z in z_rotations_deg]
+    grid_points = [(p, r, th) for p in pose_indices for r in radii for th in thetas_deg]
 
     pbar = tqdm(grid_points, desc=f"{obj_name}", unit="pt")
     n_fail = 0
     n_warn = 0
 
-    for pose_idx, x_off, z_deg in pbar:
-        z_rad = np.radians(z_deg)
+    for pose_idx, r_val, theta_deg in pbar:
+        theta_rad = np.radians(theta_deg)
         scene_cfg, obj_pose = load_tabletop_scene(
-            obj_name, pose_idx, x_offset=x_off, z_rotation=z_rad)
+            obj_name, pose_idx, r=r_val, theta=theta_rad)
 
         trial_ik_counts = []
         trial_timings = []
-        best_qpos = None
-        best_n_ik = 0
+        # Per-grasp success across trials. Key = "scene_type/scene_id/grasp_idx".
+        per_grasp_succ = {}
+        per_grasp_qpos = {}  # key -> qpos list (first successful trial's qpos)
 
         for trial in range(n_trials):
             result = planner.solve_ik(
                 scene_cfg, obj_name=obj_name,
-                grasp_version=grasp_version, seed=trial,
+                grasp_version=grasp_version, seed=trial, hand=hand,
             )
             n_ik = result["n_ik_success"]
             trial_ik_counts.append(n_ik)
             trial_timings.append(result["timing"])
 
-            if n_ik > best_n_ik:
-                best_n_ik = n_ik
-                succ_mask = result["ik_success"]
-                best_qpos = result["ik_qpos"][succ_mask].tolist() if succ_mask.any() else []
+            scene_info_trial = result["scene_info"]
+            succ_mask_trial = result["ik_success"]
+            ik_qpos_trial = result["ik_qpos"]
+            for ci, ok in enumerate(succ_mask_trial):
+                if not ok:
+                    continue
+                st, sid, gid = scene_info_trial[ci]
+                key = f"{st}/{sid}/{gid}"
+                per_grasp_succ[key] = per_grasp_succ.get(key, 0) + 1
+                if key not in per_grasp_qpos:
+                    per_grasp_qpos[key] = ik_qpos_trial[ci].tolist()
 
         ik_counts = np.array(trial_ik_counts)
         avg_timing = {}
@@ -161,8 +179,8 @@ def run_reachability(obj_name, grasp_version, n_trials,
 
         entry = {
             "pose_idx": pose_idx,
-            "x_offset": x_off,
-            "z_rotation_deg": z_deg,
+            "r": r_val,
+            "theta_deg": theta_deg,
             "n_trials": n_trials,
             "trials_with_ik": n_trials_with_ik,
             "ik_counts": ik_counts.tolist(),
@@ -170,21 +188,20 @@ def run_reachability(obj_name, grasp_version, n_trials,
             "ik_min": int(ik_counts.min()),
             "ik_max": int(ik_counts.max()),
             "n_total": result["n_total"],
-
-
             "n_backward": result["n_backward"],
             "n_valid": result["n_valid"],
             "avg_timing": avg_timing,
+            "per_grasp_succ": per_grasp_succ,
         }
         grid_results.append(entry)
 
-        if best_qpos:
+        if per_grasp_qpos:
             viz_data.append({
                 "pose_idx": pose_idx,
-                "x_offset": x_off,
-                "z_rotation_deg": z_deg,
+                "r": r_val,
+                "theta_deg": theta_deg,
                 "obj_pose": obj_pose.tolist(),
-                "qpos_list": best_qpos,
+                "per_grasp_qpos": per_grasp_qpos,
             })
 
         pbar.set_postfix(fail=n_fail, warn=n_warn,
@@ -219,7 +236,7 @@ def run_reachability(obj_name, grasp_version, n_trials,
     if problem_points:
         print(f"\nProblem points ({len(problem_points)}):")
         for r in sorted(problem_points, key=lambda x: x["trials_with_ik"]):
-            print(f"  pose={r['pose_idx']} x={r['x_offset']:.2f} z={r['z_rotation_deg']:3.0f}°  "
+            print(f"  pose={r['pose_idx']} r={r['r']:.2f} θ={r['theta_deg']:3.0f}°  "
                   f"ik_success={r['trials_with_ik']}/{r['n_trials']}  "
                   f"ik_count={r['ik_mean']:.1f}±{np.std(r['ik_counts']):.1f}")
 
@@ -232,8 +249,8 @@ def run_reachability(obj_name, grasp_version, n_trials,
         "obj_name": obj_name,
         "grasp_version": grasp_version,
         "n_trials": n_trials,
-        "x_offsets": x_offsets,
-        "z_rotations_deg": z_rotations_deg,
+        "radii": radii,
+        "thetas_deg": thetas_deg,
         "pose_indices": pose_indices,
         "n_reachable": n_reachable,
         "n_partial": n_partial,
@@ -259,23 +276,31 @@ def run_reachability(obj_name, grasp_version, n_trials,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="IK reachability grid search")
     parser.add_argument("--obj", type=str, default=None, help="Object name (omit for all)")
+    parser.add_argument("--hand", type=str, default="allegro",
+                        choices=["allegro", "inspire", "inspire_left"],
+                        help="Hand type (selects candidates + robot config)")
     parser.add_argument("--version", type=str, required=True, help="Grasp candidate version")
     parser.add_argument("--n_trials", type=int, default=10, help="Trials per grid point")
-    parser.add_argument("--x_min", type=float, default=0.2, help="Min x offset")
-    parser.add_argument("--x_max", type=float, default=0.5, help="Max x offset")
-    parser.add_argument("--x_step", type=float, default=0.05, help="X offset step")
-    parser.add_argument("--z_step", type=float, default=30, help="Z rotation step (degrees)")
+    parser.add_argument("--r_min", type=float, default=0.20, help="Min radial distance (m)")
+    parser.add_argument("--r_max", type=float, default=0.60, help="Max radial distance (m)")
+    parser.add_argument("--r_step", type=float, default=0.10, help="Radial step (m)")
+    parser.add_argument("--theta_step", type=float, default=30, help="Theta step (deg)")
     parser.add_argument("--save_dir", type=str, default=None, help="Output directory")
     args = parser.parse_args()
 
-    x_offsets = np.arange(args.x_min, args.x_max + 1e-6, args.x_step).round(3).tolist()
-    z_rotations_deg = np.arange(0, 360, args.z_step).tolist()
+    radii = np.arange(args.r_min, args.r_max + 1e-6, args.r_step).round(3).tolist()
+    thetas_deg = np.arange(0, 360, args.theta_step).tolist()
 
     if args.obj is not None:
         objects = [args.obj]
     else:
-        objects = get_all_objects()
-        print(f"Found {len(objects)} objects: {objects}\n")
+        # Restrict to objects that have candidates for the requested hand
+        from autodex.utils.path import get_candidate_path
+        cand_root = os.path.join(get_candidate_path(args.hand), args.version)
+        if not os.path.isdir(cand_root):
+            raise FileNotFoundError(f"No candidates dir: {cand_root}")
+        objects = sorted(os.listdir(cand_root))
+        print(f"Found {len(objects)} objects for hand={args.hand} version={args.version}: {objects}\n")
 
     all_summaries = {}
     for obj_name in objects:
@@ -283,13 +308,17 @@ if __name__ == "__main__":
         print(f"# {obj_name}")
         print(f"{'#' * 60}")
         try:
+            obj_save_dir = args.save_dir
+            if obj_save_dir is None and args.hand != "allegro":
+                obj_save_dir = os.path.join("outputs", "reachability", args.hand, obj_name)
             summary = run_reachability(
                 obj_name=obj_name,
                 grasp_version=args.version,
                 n_trials=args.n_trials,
-                x_offsets=x_offsets,
-                z_rotations_deg=z_rotations_deg,
-                save_dir=args.save_dir,
+                radii=radii,
+                thetas_deg=thetas_deg,
+                save_dir=obj_save_dir,
+                hand=args.hand,
             )
             if summary:
                 all_summaries[obj_name] = summary

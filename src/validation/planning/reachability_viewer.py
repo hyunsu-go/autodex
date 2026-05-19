@@ -23,9 +23,31 @@ from scipy.spatial.transform import Rotation as Rot
 sys.path.insert(0, os.path.join(os.path.expanduser("~"), "paradex"))
 
 from paradex.visualization.visualizer.viser import ViserViewer
-from autodex.utils.path import urdf_path, obj_path, load_candidate
+from autodex.utils.path import urdf_path, obj_path, load_candidate, project_dir
 from autodex.utils.conversion import cart2se3
-from autodex.utils.robot_config import INIT_STATE
+from autodex.utils.robot_config import INIT_STATE, XARM_INIT, INSPIRE_INIT
+
+
+HAND_URDF = {
+    "allegro": (
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "allegro_description", "xarm_allegro.urdf"),
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "allegro_description", "allegro_hand_description_right.urdf"),
+    ),
+    "inspire": (
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "inspire_description", "xarm_inspire.urdf"),
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "inspire_description", "inspire_hand_right.urdf"),
+    ),
+    "inspire_left": (
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "inspire_left_description", "xarm_inspire_left.urdf"),
+        os.path.join(project_dir, "content", "assets", "robot",
+                     "inspire_description", "inspire_hand_left.urdf"),
+    ),
+}
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -89,9 +111,21 @@ def load_reachability_data(data_dir):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", default="outputs/reachability")
+    parser.add_argument("--data_dir", default=None,
+                        help="Override data dir (default: outputs/reachability[/<hand>] for non-allegro)")
+    parser.add_argument("--hand", default="allegro",
+                        choices=list(HAND_URDF.keys()),
+                        help="Hand type (selects URDF + default data_dir + candidate path)")
+    parser.add_argument("--version", default="selected_100",
+                        help="Grasp candidate version (for hand pose preview)")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
+
+    if args.data_dir is None:
+        args.data_dir = (
+            os.path.join("outputs", "reachability") if args.hand == "allegro"
+            else os.path.join("outputs", "reachability", args.hand)
+        )
 
     data = load_reachability_data(args.data_dir)
     if not data:
@@ -103,9 +137,13 @@ def main():
 
     vis = ViserViewer(port_number=args.port)
 
-    # Load full robot URDF
-    urdf_full = os.path.join(urdf_path, "xarm_allegro.urdf")
-    vis.add_robot("robot", urdf_full)
+    full_urdf, hand_urdf = HAND_URDF[args.hand]
+    vis.add_robot("robot", full_urdf)
+
+    if args.hand.startswith("inspire"):
+        robot_init_state = np.concatenate([XARM_INIT, INSPIRE_INIT]).astype(np.float32)
+    else:
+        robot_init_state = INIT_STATE
 
     # Add table
     table_mesh = trimesh.creation.box(extents=TABLE_DIMS)
@@ -116,9 +154,8 @@ def main():
 
     # Add hand URDF for grasp candidate visualization
     N_HANDS = 5  # number of hands to show
-    urdf_hand = os.path.join(urdf_path, "allegro_hand_description_right.urdf")
     for i in range(N_HANDS):
-        vis.add_robot(f"hand_{i}", urdf_hand)
+        vis.add_robot(f"hand_{i}", hand_urdf)
         vis.robot_dict[f"hand_{i}"].set_visibility(False)
 
     # State
@@ -224,8 +261,8 @@ def main():
 
         pose_idx = pose_indices[min(heatmap_pose_slider.value, len(pose_indices) - 1)]
 
-        # Show robot at default (INIT_STATE) pose
-        vis.robot_dict["robot"].update_cfg(INIT_STATE)
+        # Show robot at default (init) pose
+        vis.robot_dict["robot"].update_cfg(robot_init_state)
         vis.robot_dict["robot"].set_visibility(True)
 
         z_deg_for_mesh = z_rotations[min(heatmap_z_slider.value, len(z_rotations) - 1)]
@@ -314,23 +351,29 @@ def main():
             obj_pose[:3, :3] = Rz @ obj_pose[:3, :3]
         return obj_pose
 
-    def show_hands(obj_name, obj_pose_se3, grasp_version="selected_100"):
+    def show_hands(obj_name, obj_pose_se3, grasp_version=None):
         """Load grasp candidates and show N_HANDS hands (mix of forward/backward)."""
         clear_hands()
         if obj_pose_se3 is None:
             return
 
+        if grasp_version is None:
+            grasp_version = args.version
+
         try:
             wrist_se3, pregrasp, grasp, scene_info = load_candidate(
-                obj_name, obj_pose_se3, grasp_version, shuffle=False)
+                obj_name, obj_pose_se3, grasp_version, shuffle=False, hand=args.hand)
         except Exception:
             return
 
         if len(wrist_se3) == 0:
             return
 
-        # Filter: backward facing (wrist z < 0.3)
-        backward = wrist_se3[:, 0, 2] < 0.3
+        # Filter: backward facing (right-hand only; left/inspire don't use this criterion)
+        if args.hand.startswith("inspire"):
+            backward = np.zeros(len(wrist_se3), dtype=bool)
+        else:
+            backward = wrist_se3[:, 0, 2] < 0.3
         forward_idx = np.where(~backward)[0]
         backward_idx = np.where(backward)[0]
 

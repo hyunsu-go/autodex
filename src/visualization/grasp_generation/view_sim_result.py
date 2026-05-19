@@ -31,6 +31,9 @@ HAND_URDFS = {
     "inspire_f1": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src",
                                 "curobo", "content", "assets", "robot",
                                 "inspire_f1_description", "inspire_f1_hand_right.urdf"),
+    "inspire_f1_left": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src",
+                                     "curobo", "content", "assets", "robot",
+                                     "inspire_f1_left_description", "inspire_f1_hand_left.urdf"),
 }
 
 CONTACT_ARROW_SCALE = 0.08

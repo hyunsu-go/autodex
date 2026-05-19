@@ -57,21 +57,20 @@ def _setup_logging(output_dir: str, log_dir: str) -> logging.Logger:
     return logger
 
 
-def save_bodex_output(output_dir: str, save_data: Dict):
+def save_bodex_output(output_dir: str, save_data: Dict, seed_offset: int = 0):
     batch_size = save_data["robot_pose"].shape[0]
     for b in tqdm.tqdm(range(batch_size), desc="Saving BODex outputs"):
         output_path = os.path.join(output_dir, save_data['save_prefix'][b])
         os.makedirs(output_path, exist_ok=True)
 
         num_seed = save_data["robot_pose"].shape[1]
-        if num_seed == len(os.listdir(output_path)):
-            continue
         obj_name = save_data['manip_name'][b]
 
         for ns in tqdm.tqdm(range(num_seed), desc=f"Saving seeds for batch {b}"):
-            if os.path.exists(os.path.join(output_path, str(ns))):
+            seed_id = seed_offset + ns
+            if os.path.exists(os.path.join(output_path, str(seed_id))):
                 continue
-            os.makedirs(os.path.join(output_path, str(ns)), exist_ok=True)
+            os.makedirs(os.path.join(output_path, str(seed_id)), exist_ok=True)
 
             wrist_se3 = cart2se3(save_data["robot_pose"][b, ns, 0, :7])
             pregrasp_pose = save_data["robot_pose"][b, ns, 0, 7:]
@@ -87,10 +86,10 @@ def save_bodex_output(output_dir: str, save_data: Dict):
                 "success": save_data["success"][b, ns],
             }
 
-            np.save(os.path.join(output_path, str(ns), "wrist_se3.npy"), np.linalg.inv(obj_se3) @ wrist_se3)
-            np.save(os.path.join(output_path, str(ns), "pregrasp_pose.npy"), pregrasp_pose)
-            np.save(os.path.join(output_path, str(ns), "grasp_pose.npy"), grasp_pose)
-            np.save(os.path.join(output_path, str(ns), "bodex_info.npy"), bodex_info)
+            np.save(os.path.join(output_path, str(seed_id), "wrist_se3.npy"), np.linalg.inv(obj_se3) @ wrist_se3)
+            np.save(os.path.join(output_path, str(seed_id), "pregrasp_pose.npy"), pregrasp_pose)
+            np.save(os.path.join(output_path, str(seed_id), "grasp_pose.npy"), grasp_pose)
+            np.save(os.path.join(output_path, str(seed_id), "bodex_info.npy"), bodex_info)
 
 
 if __name__ == "__main__":
@@ -103,6 +102,8 @@ if __name__ == "__main__":
                         help="Text file with object names (one per line). Overrides config obj_list.")
     parser.add_argument("--obj_root_dir", type=str, default=None,
                         help="Override object root dir (default: ~/shared_data/RSS2026_Mingi/object/paradex)")
+    parser.add_argument("--seed_offset", type=int, default=0,
+                        help="Start index for saved seed dirs (default 0). Use to append additional seeds without overwriting existing ones.")
 
     setup_logger("warn")
 
@@ -134,6 +135,7 @@ if __name__ == "__main__":
     world_generator = get_world_config_dataloader(
         manip_config_data["world"], args.parallel_world,
         manip_config_data["seed_num"], exp_name,
+        seed_offset=args.seed_offset,
         output_dir=save_dir_parent,
         obj_root_dir=args.obj_root_dir,
     )
@@ -186,7 +188,7 @@ if __name__ == "__main__":
         world_info_dict["dist_error"] = result.dist_error.detach().cpu().numpy()
         world_info_dict["success"] = result.success.detach().cpu().numpy()
 
-        save_bodex_output(save_dir, world_info_dict)
+        save_bodex_output(save_dir, world_info_dict, seed_offset=args.seed_offset)
 
         logger.info(f"BATCH objects={obj_names} success={n_success}/{n_total} time={elapsed:.1f}s")
 

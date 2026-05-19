@@ -50,6 +50,10 @@ HAND_PATHS = {
         "path": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src", "curobo", "content", "assets", "robot", "inspire_f1_description", "inspire_f1_hand_right.urdf"),
         "weld_body": "base_link",
     },
+    "inspire_f1_left": {
+        "path": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src", "curobo", "content", "assets", "robot", "inspire_f1_left_description", "inspire_f1_hand_left.urdf"),
+        "weld_body": "base_link",
+    },
 }
 
 # R_delta (same as RSS_2026 base.py)
@@ -247,6 +251,7 @@ def run_sim_filter(hand, version, obj_name, bodex_root, candidate_root, viewer=F
             "inspire": "inspire_floating.yml",
             "inspire_left": "inspire_left_floating.yml",
             "inspire_f1": "inspire_f1_floating.yml",
+            "inspire_f1_left": "inspire_f1_left_floating.yml",
         }
         hand_coll_cfg = os.path.join(_local_configs, hand_coll_cfgs.get(hand, "inspire_floating.yml"))
         planner = GraspPlanner(hand_cfg_path=hand_coll_cfg)
@@ -365,7 +370,7 @@ def run_sim_filter(hand, version, obj_name, bodex_root, candidate_root, viewer=F
 
         if hand in ("inspire", "inspire_left"):
             mimic_map = INSPIRE_MIMIC_MAP
-        elif hand == "inspire_f1":
+        elif hand in ("inspire_f1", "inspire_f1_left"):
             mimic_map = INSPIRE_F1_MIMIC_MAP
         else:
             mimic_map = None

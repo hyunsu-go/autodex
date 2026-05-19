@@ -16,6 +16,7 @@ from curobo.geom.types import WorldConfig
 from curobo.wrap.reacher.motion_gen import MotionGen, MotionGenConfig, MotionGenPlanConfig
 from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
 from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
+from curobo.geom.sdf.world import CollisionQueryBuffer
 from curobo.util.trajectory import InterpolateType
 
 from autodex.utils.path import robot_configs_path, load_candidate, project_dir
@@ -91,8 +92,8 @@ class GraspPlanner:
     N_MESHES = 5
 
     HAND_CONFIGS = {
-        "allegro": ("xarm_allegro.yml", "allegro_floating.yml", 0.01, 32, InterpolateType.CUBIC),
-        "inspire": ("xarm_inspire.yml", "inspire_floating.yml", 0.002, 32, InterpolateType.LINEAR_CUDA),
+        "allegro":      ("xarm_allegro.yml",      "allegro_floating.yml",      0.01,  32, InterpolateType.CUBIC),
+        "inspire":      ("xarm_inspire.yml",      "inspire_floating.yml",      0.002, 32, InterpolateType.LINEAR_CUDA),
         "inspire_left": ("xarm_inspire_left.yml", "inspire_left_floating.yml", 0.002, 32, InterpolateType.LINEAR_CUDA),
     }
 
@@ -130,12 +131,9 @@ class GraspPlanner:
         self._cached_world: Optional[dict] = None
 
         # Init state: same arm position for all hands, hand-specific finger init
-        if hand == "inspire":
+        if hand.startswith("inspire"):
             self._init_state = np.concatenate([XARM_INIT, INSPIRE_INIT]).astype(np.float32)
             self._link6_to_wrist_rot = INSPIRE_LINK6_TO_WRIST[:3, :3]
-        elif hand == "inspire_left":
-            self._init_state = np.concatenate([XARM_INIT, INSPIRE_INIT]).astype(np.float32)
-            self._link6_to_wrist_rot = INSPIRE_LEFT_LINK6_TO_WRIST[:3, :3]
         else:
             self._init_state = INIT_STATE.astype(np.float32)
             self._link6_to_wrist_rot = ALLEGRO_LINK6_TO_WRIST[:3, :3]
@@ -242,6 +240,86 @@ class GraspPlanner:
         self_coll = (d_self > 0).cpu().numpy()
         return world_coll | self_coll
 
+    def check_collision_per_sphere(self, world_cfg: dict, wrist_se3: np.ndarray, pregrasp: np.ndarray,
+                                    compute_esdf: bool = False):
+        """Per-sphere world collision.
+
+        Accepts either a single (4, 4) + (J,) or batched (B, 4, 4) + (B, J).
+
+        Args:
+            compute_esdf: if True, return per-sphere signed distance instead of bool.
+                          Signed distance is negative outside obstacles, positive inside.
+
+        Returns:
+            centers: (B, N_s, 3) — or (N_s, 3) if input was unbatched
+            radii:   (N_s,)
+            result:  (B, N_s) bool collide if compute_esdf=False, else
+                     (B, N_s) float signed distance.
+                     Unbatched output is (N_s,).
+        """
+        unbatched = wrist_se3.ndim == 2
+        if unbatched:
+            wrist_se3 = wrist_se3[None]
+            pregrasp = pregrasp[None]
+
+        rw_config = RobotWorldConfig.load_from_config(
+            self._hand_cfg,
+            WorldConfig.from_dict(world_cfg),
+            collision_activation_distance=0.0,
+            tensor_args=self._tensor_args,
+        )
+        rw = RobotWorld(rw_config)
+        n_dof = rw.kinematics.get_dof()
+
+        if n_dof == pregrasp.shape[1] + 6:
+            q = np.array([se32action(w, g) for w, g in zip(wrist_se3, pregrasp)])
+        else:
+            from autodex.utils.conversion import se32cart
+            q = np.array([np.concatenate([se32cart(w), g]) for w, g in zip(wrist_se3, pregrasp)])
+            if q.shape[1] != n_dof:
+                q = pregrasp
+
+        q_t = torch.tensor(q, dtype=torch.float32, device=self._tensor_args.device)
+        state = rw.get_kinematics(q_t)
+        spheres = state.link_spheres_tensor.unsqueeze(1)  # (B, 1, N_s, 4)
+
+        buffer = CollisionQueryBuffer.initialize_from_shape(
+            spheres.shape, self._tensor_args, rw.world_model.collision_types
+        )
+        weight = torch.tensor([1.0], dtype=torch.float32, device=self._tensor_args.device)
+        act = torch.tensor([0.0], dtype=torch.float32, device=self._tensor_args.device)
+
+        # BODex fork added `contact_distance` (required, not optional in its kernel);
+        # upstream cuRobo doesn't have the kwarg at all. Detect by signature.
+        import inspect
+        sig = inspect.signature(rw.world_model.get_sphere_distance)
+        kwargs = {"sum_collisions": False}
+        if compute_esdf:
+            kwargs["compute_esdf"] = True
+        if "contact_distance" in sig.parameters:
+            kwargs["contact_distance"] = torch.zeros(
+                spheres.shape[2], dtype=torch.float32, device=self._tensor_args.device,
+            )
+        d = rw.world_model.get_sphere_distance(spheres, buffer, weight, act, **kwargs)
+
+        centers = spheres[:, 0, :, :3].detach().cpu().numpy()  # (B, N_s, 3)
+        radii   = spheres[0, 0, :, 3].detach().cpu().numpy()   # (N_s,)
+        d_flat = d.view(d.shape[0], -1).detach().cpu().numpy()
+        if compute_esdf:
+            result = d_flat  # signed distance: negative outside, positive inside
+        else:
+            result = (d_flat > 0)  # bool collide
+
+        # Filter zero-radius placeholder spheres.
+        valid = radii > 1e-6
+        centers = centers[:, valid, :]
+        radii = radii[valid]
+        result = result[:, valid]
+
+        if unbatched:
+            return centers[0], radii, result[0]
+        return centers, radii, result
+
     # ── IK solver ─────────────────────────────────────────────────────────────
 
     def _init_ik_solver(self, world_cfg: dict):
@@ -289,7 +367,7 @@ class GraspPlanner:
 
         # Filter: backward + hand-table collision (no object mesh — hand should be near object)
         t0 = _time.time()
-        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand in ("inspire", "inspire_left") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
+        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand.startswith("inspire") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
         collision = self._check_collision(world_cfg_no_target, wrist_se3, pregrasp)
         filtered = backward | collision
         valid = np.where(~filtered)[0]
@@ -543,7 +621,7 @@ class GraspPlanner:
 
         t0 = _time.time()
         collision = self._check_collision(world_cfg, wrist_se3, pregrasp)
-        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand in ("inspire", "inspire_left") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
+        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand.startswith("inspire") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
         valid = np.where(~(collision | backward))[0]
         timing["collision_check_s"] = round(_time.time() - t0, 3)
 
@@ -662,7 +740,7 @@ class GraspPlanner:
         t0 = _time.time()
         N = len(wrist_se3)
         collision = self._check_collision(world_cfg, wrist_se3, pregrasp)
-        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand in ("inspire", "inspire_left") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
+        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand.startswith("inspire") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
         filtered = collision | backward
         valid = np.where(~filtered)[0]
         print(f"[planner] collision check: {_time.time() - t0:.2f}s")
@@ -765,7 +843,7 @@ class GraspPlanner:
 
         # 3. Filter: backward + hand-table collision
         t0 = _time.time()
-        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand in ("inspire", "inspire_left") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
+        backward = np.zeros(len(wrist_se3), dtype=bool) if self._hand.startswith("inspire") else (wrist_se3[:, :3, :3] @ self._link6_y_in_wrist)[:, 2] < 0.3
         print(f"[backward] wrist x-axis z: {wrist_se3[:, 0, 2]}")
         collision = self._check_collision(world_cfg_no_target, wrist_se3, pregrasp)
         valid = np.where(~(backward | collision))[0]

@@ -28,55 +28,66 @@ def get_object_mesh(obj_name):
 
 
 def load_candidate(obj_name, obj_pose, version, shuffle=True, skip_done=True, success_only=False, hand="allegro"):
+    """Load all grasp candidates under ``{candidates}/{hand}/{version}/{obj}``.
+
+    Supports both layouts (auto-detected by walking until ``wrist_se3.npy`` is found):
+        nested: ``{obj}/{scene_type}/{scene_id}/{grasp_idx}/wrist_se3.npy``
+        flat:   ``{obj}/{scene_id}/{grasp_idx}/wrist_se3.npy``
+
+    In the flat case the returned scene_info has ``scene_type=""``.
+    """
     wrist_se3_list = []
     pregrasp_pose_list = []
     grasp_pose_list = []
     scene_info = []
 
     candidate_obj_path = os.path.join(get_candidate_path(hand), version, obj_name)
+    if not os.path.isdir(candidate_obj_path):
+        return np.empty((0, 4, 4)), np.empty((0, 0)), np.empty((0, 0)), []
 
-    scene_types = os.listdir(candidate_obj_path)
+    # Walk to find every grasp dir (one containing wrist_se3.npy).
+    grasp_dirs = []
+    for dirpath, dirnames, filenames in os.walk(candidate_obj_path):
+        if "wrist_se3.npy" in filenames:
+            grasp_dirs.append(dirpath)
+            dirnames[:] = []  # don't descend further
+
     if shuffle:
-        random.shuffle(scene_types)
+        random.shuffle(grasp_dirs)
     else:
-        scene_types = sorted(scene_types)
+        grasp_dirs.sort()
 
-    for scene_type in scene_types:
-        scene_ids = os.listdir(os.path.join(candidate_obj_path, scene_type))
-        if shuffle:
-            random.shuffle(scene_ids)
+    for base in grasp_dirs:
+        rel = os.path.relpath(base, candidate_obj_path)
+        parts = rel.split(os.sep)
+        if len(parts) == 3:
+            scene_type, scene_id, grasp_idx = parts
+        elif len(parts) == 2:
+            scene_type = ""
+            scene_id, grasp_idx = parts
         else:
-            scene_ids = sorted(scene_ids)
+            # Unexpected depth — skip.
+            continue
 
-        for scene_id in scene_ids:
-            grasp_idxs = os.listdir(os.path.join(candidate_obj_path, scene_type, scene_id))
-            if shuffle:
-                random.shuffle(grasp_idxs)
-            else:
-                grasp_idxs = sorted(grasp_idxs)
-
-            for grasp_idx in grasp_idxs:
-                base = os.path.join(candidate_obj_path, scene_type, scene_id, grasp_idx)
-                result_path = os.path.join(base, "result.json")
-                has_result = os.path.exists(result_path)
-                # success_only: only load candidates with success=True
-                if success_only:
-                    if not has_result:
-                        continue
-                    import json
-                    with open(result_path) as f:
-                        if not json.load(f).get("success", False):
-                            continue
-                # skip_done: skip candidates that already have a result
-                elif skip_done and has_result:
+        result_path = os.path.join(base, "result.json")
+        has_result = os.path.exists(result_path)
+        if success_only:
+            if not has_result:
+                continue
+            import json
+            with open(result_path) as f:
+                if not json.load(f).get("success", False):
                     continue
-                pregrasp = np.load(os.path.join(base, "pregrasp_pose.npy"))
-                pregrasp_pose_list.append(pregrasp)
-                grasp_file = os.path.join(base, "grasp_pose.npy")
-                grasp_pose_list.append(np.load(grasp_file) if os.path.exists(grasp_file) else pregrasp)
-                wrist_se3_obj = np.load(os.path.join(base, "wrist_se3.npy"))
-                wrist_se3_list.append(obj_pose @ wrist_se3_obj)
-                scene_info.append((scene_type, scene_id, grasp_idx))
+        elif skip_done and has_result:
+            continue
+
+        pregrasp = np.load(os.path.join(base, "pregrasp_pose.npy"))
+        pregrasp_pose_list.append(pregrasp)
+        grasp_file = os.path.join(base, "grasp_pose.npy")
+        grasp_pose_list.append(np.load(grasp_file) if os.path.exists(grasp_file) else pregrasp)
+        wrist_se3_obj = np.load(os.path.join(base, "wrist_se3.npy"))
+        wrist_se3_list.append(obj_pose @ wrist_se3_obj)
+        scene_info.append((scene_type, scene_id, grasp_idx))
 
     wrist_se3 = np.array(wrist_se3_list)
     grasp_pose = np.array(grasp_pose_list)

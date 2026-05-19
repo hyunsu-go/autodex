@@ -142,12 +142,12 @@ def main():
     )
     print(f"[fp] best by IoU: {best_s}")
 
-    sil_views = [{
-        "mask": (masks[best_s].astype(np.uint8) * 255),
-        "K": K[best_s].astype(np.float32),
-        "extrinsic": T[best_s].astype(np.float64),
-    }]
-    print(f"[sil] refining over best view {best_s} ...")
+    sil_views = [
+        {"mask": (m.astype(np.uint8) * 255), "K": K[s].astype(np.float32),
+         "extrinsic": T[s].astype(np.float64)}
+        for s, m in masks.items() if int(m.sum()) >= 100
+    ]
+    print(f"[sil] refining over {len(sil_views)} views ...")
     p_fp_post, sil_loss = sil_opt.optimize(p_fp_pre, sil_views, iters=100, lr=0.002, antialias=True)
     print(f"[sil] refine done: final_loss={sil_loss:.6f}")
 

@@ -54,6 +54,11 @@ HAND_URDFS = {
         "content", "assets", "robot", "inspire_f1_description",
         "inspire_f1_hand_right.urdf",
     ),
+    "inspire_f1_left": os.path.join(
+        REPO_ROOT, "src", "grasp_generation", "BODex", "src", "curobo",
+        "content", "assets", "robot", "inspire_f1_left_description",
+        "inspire_f1_hand_left.urdf",
+    ),
 }
 
 HAND_SPHERES = {
@@ -65,6 +70,8 @@ HAND_SPHERES = {
                                   "curobo", "content", "configs", "robot", "spheres", "inspire.yml"),
     "inspire_f1": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src",
                                 "curobo", "content", "configs", "robot", "spheres", "inspire_f1.yml"),
+    "inspire_f1_left": os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex", "src",
+                                     "curobo", "content", "configs", "robot", "spheres", "inspire_f1_left.yml"),
 }
 
 THICK = 0.02
