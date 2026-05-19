@@ -412,7 +412,14 @@ class InitOrchestrator:
         # interactive sessions. Just close the local sockets.
         self._mask_thread.stop(); self._pose_thread.stop()
         try:
+            # LINGER=0 so close() doesn't wait for queued messages to drain to
+            # a dead daemon — otherwise context.term() hangs indefinitely on
+            # any REQ socket left mid-cycle (wait=False sends).
             for s in self.cmd.sockets.values():
+                try:
+                    s.setsockopt(zmq.LINGER, 0)
+                except Exception:
+                    pass
                 s.close()
             self.cmd.context.term()
         except Exception:

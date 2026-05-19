@@ -172,7 +172,7 @@ def run_single_trial(
     )
     result = planner.plan(
         scene_cfg, obj, args.grasp_version,
-        skip_done=(args.scene == "table"),
+        skip_done=False,
         success_only=args.success_only, hand=hand,
     )
     timing["plan_s"] = round(time.time() - t0, 2)
@@ -183,7 +183,7 @@ def run_single_trial(
         wrist_se3, _, grasp_pose, filtered = planner.get_candidates(
             scene_cfg, obj, args.grasp_version,
             success_only=args.success_only,
-            skip_done=(args.scene == "table"), hand=hand,
+            skip_done=False, hand=hand,
         )
         fv = ScenePlanVisualizer(scene_cfg, None, port=8080, hand=hand)
         fv.add_candidates(wrist_se3, grasp_pose, filtered)

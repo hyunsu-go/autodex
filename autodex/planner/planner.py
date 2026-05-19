@@ -18,7 +18,7 @@ from curobo.wrap.reacher.ik_solver import IKSolver, IKSolverConfig
 from curobo.wrap.model.robot_world import RobotWorld, RobotWorldConfig
 from curobo.util.trajectory import InterpolateType
 
-from autodex.utils.path import robot_configs_path, load_candidate
+from autodex.utils.path import robot_configs_path, load_candidate, project_dir
 from autodex.utils.conversion import se32action, cart2se3
 from autodex.utils.robot_config import (
     INIT_STATE, XARM_INIT, INSPIRE_INIT,
@@ -110,10 +110,24 @@ class GraspPlanner:
 
         self._robot_cfg = load_yaml(robot_cfg_path)["robot_cfg"]
         self._hand_cfg = load_yaml(hand_cfg_path)["robot_cfg"]
+        # Redirect curobo's robot config / asset lookups to AutoDex's content
+        # dir. Without this curobo falls back to its install-internal content
+        # (e.g. /home/robot/RSS_2026/planner/src/curobo/content/) which only
+        # ships xarm_allegro spheres — xarm_inspire / xarm_inspire_left live
+        # under shared_data/AutoDex/content/configs/robot/spheres/.
+        _ext_robot = robot_configs_path
+        _ext_asset = os.path.join(project_dir, "content", "assets")
+        for _cfg in (self._robot_cfg, self._hand_cfg):
+            _cfg.setdefault("kinematics", {})
+            _cfg["kinematics"]["external_robot_configs_path"] = _ext_robot
+            _cfg["kinematics"]["external_asset_path"] = _ext_asset
         self._tensor_args = TensorDeviceType()
         self._motion_gen: Optional[MotionGen] = None
         self._plan_cfg: Optional[MotionGenPlanConfig] = None
         self._ik_solver: Optional[IKSolver] = None
+        # Last world_cfg loaded into motion_gen — used to skip full rebuild when
+        # only mesh poses changed across plan() calls.
+        self._cached_world: Optional[dict] = None
 
         # Init state: same arm position for all hands, hand-specific finger init
         if hand == "inspire":
@@ -154,8 +168,8 @@ class GraspPlanner:
         self._plan_cfg = MotionGenPlanConfig(
             enable_graph=True,
             enable_opt=True,
-            enable_graph_attempt=4,
-            max_attempts=20,
+            enable_graph_attempt=2,    # was 4 — fewer GP retries per call
+            max_attempts=5,            # was 20 — cap internal retry storm
             enable_finetune_trajopt=True,
             num_trajopt_seeds=32,
             num_ik_seeds=32,
@@ -166,6 +180,36 @@ class GraspPlanner:
     def _update_world(self, world_cfg: dict):
         self._motion_gen.clear_world_cache()
         self._motion_gen.update_world(WorldConfig.from_dict(world_cfg))
+
+    def _world_structure_changed(self, new_cfg: dict) -> bool:
+        """True if anything other than mesh-pose entries changed vs cache.
+        When False, we can in-place update only the mesh poses (~1ms) instead
+        of a full clear_world_cache + update_world (~10-20ms + roadmap loss)."""
+        if self._cached_world is None:
+            return True
+        old, new = self._cached_world, new_cfg
+        if old.get("cuboid", {}) != new.get("cuboid", {}):
+            return True
+        om, nm = old.get("mesh", {}), new.get("mesh", {})
+        if set(om) != set(nm):
+            return True
+        for k in om:
+            if om[k].get("file_path") != nm[k].get("file_path"):
+                return True
+        return False
+
+    def _update_target_pose_only(self, new_cfg: dict):
+        """In-place update of every mesh's pose in the existing motion_gen world.
+        Assumes structure unchanged (caller is responsible — see
+        _world_structure_changed). IK solver world has empty mesh dict so no
+        update needed there."""
+        device = self._tensor_args.device
+        for name, info in new_cfg.get("mesh", {}).items():
+            p = info["pose"]   # [x, y, z, qw, qx, qy, qz]
+            pos = torch.tensor(p[:3], dtype=torch.float32, device=device).unsqueeze(0)
+            quat = torch.tensor(p[3:], dtype=torch.float32, device=device).unsqueeze(0)
+            pose = Pose(position=pos, quaternion=quat)
+            self._motion_gen.world_coll_checker.update_obstacle_pose(name, pose)
 
     # ── collision check ───────────────────────────────────────────────────────
 
@@ -351,6 +395,52 @@ class GraspPlanner:
         if trajs is not None and trajs.ndim == 2:
             trajs = trajs[np.newaxis]
         return success, trajs
+
+    def plan_js_to_init(self, scene_cfg: dict,
+                        start_arm_qpos: np.ndarray,
+                        start_hand_qpos: Optional[np.ndarray] = None,
+                        goal_arm_qpos: Optional[np.ndarray] = None
+                        ) -> Optional[np.ndarray]:
+        """Plan a joint-space retract trajectory:
+        ``(start_arm, start_hand) -> init_state``.
+
+        ``start_hand_qpos`` must be in the planner's (curobo URDF) joint order
+        — same order as ``plan_result.pregrasp_pose`` / ``grasp_pose``. If
+        omitted, defaults to ``init_state[6:]`` (fully open hand). When the
+        real hand is at pregrasp, pass ``plan_result.pregrasp_pose`` so the
+        planner's collision check matches the actual configuration.
+
+        Uses the existing motion_gen world if available; falls back to a full
+        init/rebuild only when scene structure (cuboids, mesh keys, file paths)
+        differs from the cached world. The world's `target` mesh is updated to
+        wherever the caller has moved it in `scene_cfg` — typical use is to
+        reflect the placed object's new resting pose.
+
+        Returns the interpolated traj (T, dof) or None if planning failed.
+        """
+        world_cfg = _to_curobo_world(scene_cfg)
+        if self._motion_gen is None:
+            self._init_motion_gen(world_cfg)
+        elif self._world_structure_changed(world_cfg):
+            self._update_world(world_cfg)
+        else:
+            self._update_target_pose_only(world_cfg)
+        self._cached_world = world_cfg
+
+        if start_hand_qpos is None:
+            start_hand_qpos = self._init_state[6:]
+        start_full = np.concatenate([
+            np.asarray(start_arm_qpos[:6], dtype=np.float32),
+            np.asarray(start_hand_qpos, dtype=np.float32),
+        ])
+        if goal_arm_qpos is None:
+            goal_arm_qpos = self._init_state[:6]
+        goal_full = np.concatenate([
+            np.asarray(goal_arm_qpos[:6], dtype=np.float32),
+            self._init_state[6:].astype(np.float32),
+        ])
+        ok, traj = self._refine_fingers(start_full, goal_full)
+        return traj if ok else None
 
     def _refine_fingers(self, init_state: np.ndarray, goal_joint: np.ndarray):
         """Joint-space trajopt for full DOF (arm + fingers). Returns (ok, traj)."""
@@ -659,8 +749,12 @@ class GraspPlanner:
         world_cfg = _to_curobo_world(scene_cfg)
         if self._motion_gen is None:
             self._init_motion_gen(world_cfg)
-        else:
+        elif self._world_structure_changed(world_cfg):
             self._update_world(world_cfg)
+        else:
+            # Only target mesh pose changed — in-place pose update keeps roadmap.
+            self._update_target_pose_only(world_cfg)
+        self._cached_world = world_cfg
         world_cfg_no_target = dict(world_cfg)
         world_cfg_no_target["mesh"] = {}
         if self._ik_solver is None:
