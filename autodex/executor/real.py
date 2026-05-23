@@ -16,6 +16,7 @@ Usage:
 import datetime
 import os
 import time
+from typing import Optional
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -92,6 +93,151 @@ HAND_CONFIG = {
 }
 
 
+# ── Contact monitor (shared by place / execute / reset) ──────────────────────
+
+# Tau conversion constants used by mcc_minimal's stream pipeline. Multiplies
+# raw _joints_torque (current in xArm's reported units) to Nm.
+KT = np.array([0.067, 0.067, 0.0573, 0.0573, 0.056, 0.056])
+GEAR = np.full(6, 100.0)
+# Per-joint baseline noise (Nm) — from mcc DEADBAND_J.
+DEADBAND_J = np.array([3.0, 3.0, 3.0, 1.0, 2.0, 0.5])
+
+
+class ContactDetected(RuntimeError):
+    """Raised by motion primitives when a ContactMonitor fires.
+    Propagates out of execute() / reset() so the caller can abort the trial
+    cleanly instead of continuing into pregrasp/grasp at the wrong pose."""
+    def __init__(self, where: str, tau_dev, ratio):
+        self.where = where
+        self.tau_dev = tau_dev
+        self.ratio = ratio
+        super().__init__(f"contact during {where}: tau_dev={tau_dev.round(2)} "
+                         f"ratio={ratio.round(2)}")
+
+
+class ContactMonitor:
+    """Torque-based contact detection using a learned tau_model.
+
+    Usage:
+        m = ContactMonitor(xarm_handle, model_path,
+                           watch_joints=(1, 2), thresh_nm=10.0,
+                           sustained_ticks=8, startup_blank_s=0.5)
+        m.warmup(seconds=1.0)              # call when arm is static at start pose
+        while moving:
+            ...                            # send servo command
+            if m.tick():                   # returns True on contact
+                break
+    """
+
+    def __init__(self, xarm_handle, model_path,
+                 watch_joints=(1, 2), thresh_nm=10.0,
+                 sustained_ticks: int = 8, startup_blank_s: float = 0.5,
+                 dt: float = 0.01,
+                 filter_alpha: float = 0.1, qdot_alpha: float = 0.1):
+        from pathlib import Path
+        import torch  # noqa: F401  (deferred — only loaded if monitor used)
+        from autodex.executor.tau_model import load_model
+        if model_path is None:
+            model_path = str(Path.home() / "shared_data" / "AutoDex"
+                             / "weights" / "tau_model" / "inspire_left.pt")
+        # Allow tighter / looser thresholds per joint by scaling the
+        # deadband. thresh_nm applies to watch_joints (assumed shared scale).
+        self._model = load_model(model_path)
+        self._xarm = xarm_handle
+        self._watch = list(watch_joints)
+        # Per-joint threshold: scaled deadband so off-watch joints don't
+        # accidentally count if caller widens the watch set later.
+        scale_per_joint = np.maximum(DEADBAND_J, 1e-6)
+        # On watched joints, set threshold to user-given thresh_nm. Others
+        # default to DEADBAND_J * (thresh_nm / DEADBAND_J[watch_joints[0]]).
+        ref_db = DEADBAND_J[self._watch[0]]
+        self._thresh = scale_per_joint * (thresh_nm / ref_db)
+        self._sustained_req = sustained_ticks
+        self._blank = startup_blank_s
+        self._dt = dt
+        self._filter_alpha = filter_alpha
+        self._qdot_alpha = qdot_alpha
+        self._tau_filt = np.zeros(6)
+        self._qdot_smooth = np.zeros(6)
+        self._q_last = None
+        self._t_last = None
+        self._baseline = np.zeros(6)
+        self._t0 = None
+        self._sustained = 0
+        self._last_dev = np.zeros(6)
+        self._last_ratio = np.zeros(6)
+
+    def _read(self):
+        _, q_deg = self._xarm.get_servo_angle()
+        q = np.deg2rad(np.asarray(q_deg[:6], dtype=np.float64))
+        I = np.asarray(self._xarm._arm._joints_torque[:6], dtype=np.float64)
+        tau = I * KT * GEAR
+        return q, tau
+
+    def _predict_tau_ext(self):
+        import torch
+        from autodex.executor.tau_model import build_input
+        q, tau_motor = self._read()
+        t_now = time.time()
+        if self._q_last is not None and self._t_last is not None:
+            dt = max(t_now - self._t_last, 1e-4)
+            qdot = (q - self._q_last) / dt
+        else:
+            qdot = np.zeros(6)
+        self._q_last, self._t_last = q.copy(), t_now
+        self._qdot_smooth = (self._qdot_alpha * qdot
+                             + (1 - self._qdot_alpha) * self._qdot_smooth)
+        x = build_input(
+            q[None, :], self._qdot_smooth[None, :],
+            use_sincos=self._model.use_sincos,
+            use_qdot=self._model.use_qdot,
+            use_sign_qdot=getattr(self._model, "use_sign_qdot", False),
+        )[0].astype(np.float32)
+        with torch.no_grad():
+            tau_hat = self._model.predict_full(torch.from_numpy(x)).numpy()
+        tau_ext = tau_hat - tau_motor
+        self._tau_filt = (self._filter_alpha * tau_ext
+                          + (1 - self._filter_alpha) * self._tau_filt)
+        return self._tau_filt
+
+    def warmup(self, seconds: float = 1.0):
+        """Hold the arm static at its current pose and capture baseline."""
+        t0 = time.time()
+        while time.time() - t0 < seconds:
+            self._predict_tau_ext()
+            time.sleep(self._dt)
+        self._baseline = self._tau_filt.copy()
+        self._t0 = time.time()
+        self._sustained = 0
+
+    def tick(self) -> bool:
+        """Update reading once, return True iff contact sustained over watched
+        joints AND the startup blank period has elapsed."""
+        if self._t0 is None:
+            return False
+        self._predict_tau_ext()
+        tau_dev = self._tau_filt - self._baseline
+        ratio = np.abs(tau_dev) / np.maximum(self._thresh, 1e-6)
+        self._last_dev = tau_dev
+        self._last_ratio = ratio
+        t = time.time() - self._t0
+        watched = ratio[self._watch]
+        crossed = bool(np.any(watched > 1.0))
+        if crossed and t > self._blank:
+            self._sustained += 1
+        else:
+            self._sustained = 0
+        return self._sustained >= self._sustained_req
+
+    @property
+    def last_dev(self):
+        return self._last_dev
+
+    @property
+    def last_ratio(self):
+        return self._last_ratio
+
+
 class RealExecutor:
     def __init__(
         self,
@@ -116,6 +262,17 @@ class RealExecutor:
         self.arm = get_arm(arm_name)
         self.hand = get_hand(hand_name)
 
+        # Disable xArm's internal collision sensitivity once for the whole
+        # session. Otherwise the firmware can self-stop on small torque
+        # spikes (esp. during sequential / approach motions) and silently
+        # ignore subsequent servo commands — arm appears to "stall" mid
+        # trajectory. Our ContactMonitor handles real collision detection.
+        try:
+            self.arm.arm.set_report_tau_or_i(1)
+            self.arm.arm.set_collision_sensitivity(0)
+        except Exception as _e:
+            print(f"[executor] could not disable xarm collision sensitivity: {_e!r}")
+
         # Safety velocity limits
         self.joint_vel_limit = 0.05
         self.cart_vel_limit = 0.002
@@ -132,7 +289,8 @@ class RealExecutor:
             delta = delta / norm * limit
         return current + delta
 
-    def _move_joints(self, arm_traj, hand_traj=None, threshold=0.02):
+    def _move_joints(self, arm_traj, hand_traj=None, threshold=0.02,
+                     monitor: "Optional[ContactMonitor]" = None):
         for i in range(len(arm_traj)):
             target_arm = arm_traj[i]
             target_hand = hand_traj[i] if hand_traj is not None else None
@@ -159,6 +317,9 @@ class RealExecutor:
                 nxt = self._safe_joint_step(cur, target_arm)
                 self.arm.move(nxt, is_servo=True)
                 time.sleep(self.dt)
+                if monitor is not None and monitor.tick():
+                    raise ContactDetected("_move_joints",
+                                          monitor.last_dev, monitor.last_ratio)
                 if np.linalg.norm(self.arm.get_data()["qpos"] - target_arm) < threshold:
                     break
 
@@ -168,7 +329,8 @@ class RealExecutor:
 
     def _move_cartesian(self, target_pose, threshold_t=0.002, threshold_r=0.02,
                         vel_scale=1.0, stop_on_stall=False,
-                        stall_window=30, stall_progress_ratio=0.3):
+                        stall_window=30, stall_progress_ratio=0.3,
+                        monitor: "Optional[ContactMonitor]" = None):
         """Stall detection is window-based + ratio to commanded velocity:
         over the last `stall_window` ticks the arm should advance roughly
         (cart_vel_limit * vel_scale * stall_window) meters in free motion.
@@ -227,29 +389,49 @@ class RealExecutor:
                 cur[:3, :3] = (Rotation.from_rotvec(r_delta) * cur_rot).as_matrix()
             self.arm.move(cur, is_servo=True)
             time.sleep(self.dt)
+            if monitor is not None and monitor.tick():
+                raise ContactDetected("_move_cartesian",
+                                      monitor.last_dev, monitor.last_ratio)
             actual = self.arm.get_data()["position"]
             if (np.linalg.norm(actual[:3, 3] - target_pose[:3, 3]) < threshold_t
                     and np.linalg.norm((target_rot * Rotation.from_matrix(actual[:3, :3]).inv()).as_rotvec()) < threshold_r):
                 break
 
-    def _move_joint_sequential(self, target_qpos, joint_order, threshold=0.06):
+    def _move_joint_sequential(self, target_qpos, joint_order, threshold=0.06,
+                               monitor: "Optional[ContactMonitor]" = None):
         current_target = self.arm.get_data()["qpos"].copy()
         for j in joint_order:
             current_target[j] = target_qpos[j]
             stall_count = 0
             prev_qpos = None
             recovered = False
+            j_start = float(self.arm.get_data()["qpos"][j])
+            iter_count = 0
+            converged = False
             for _ in range(500):
+                iter_count += 1
                 cur = self.arm.get_data()["qpos"]
                 if prev_qpos is not None and np.linalg.norm(cur - prev_qpos) < 1e-4:
                     stall_count += 1
                     if stall_count >= 50 and not recovered:
-                        print(f"[executor] joint {j} stall, clearing error...")
+                        try:
+                            err, warn = self.arm.arm.get_err_warn_code()
+                        except Exception as _ee:
+                            err, warn = ("?", repr(_ee))
+                        print(f"[executor] joint {j} stall at qpos={cur.round(3)} "
+                              f"target={current_target.round(3)}  "
+                              f"xarm err={err} warn={warn} — clearing...")
                         self.arm.clear_error()
                         recovered = True
                         stall_count = 0
                     elif stall_count >= 100:
-                        print(f"[executor] joint {j} stall after recovery, skipping")
+                        try:
+                            err, warn = self.arm.arm.get_err_warn_code()
+                        except Exception as _ee:
+                            err, warn = ("?", repr(_ee))
+                        print(f"[executor] joint {j} stall after recovery at "
+                              f"qpos={cur.round(3)} target={current_target.round(3)}  "
+                              f"xarm err={err} warn={warn} — skipping")
                         break
                 else:
                     stall_count = 0
@@ -257,8 +439,26 @@ class RealExecutor:
                 nxt = self._safe_joint_step(cur, current_target, vel_limit=0.06)
                 self.arm.move(nxt, is_servo=True)
                 time.sleep(self.dt)
+                if monitor is not None and monitor.tick():
+                    raise ContactDetected(f"_move_joint_sequential (joint {j})",
+                                          monitor.last_dev, monitor.last_ratio)
                 if np.abs(self.arm.get_data()["qpos"][j] - target_qpos[j]) < threshold:
+                    converged = True
                     break
+            # Post-loop diagnostic: ALWAYS report if joint didn't converge,
+            # even when stall_count never reached 50 (slow-motion / partial
+            # progress case).
+            j_end = float(self.arm.get_data()["qpos"][j])
+            j_err = abs(j_end - target_qpos[j])
+            if not converged:
+                try:
+                    err, warn = self.arm.arm.get_err_warn_code()
+                except Exception as _ee:
+                    err, warn = ("?", repr(_ee))
+                print(f"[executor] joint {j} did NOT converge in {iter_count} iters: "
+                      f"start={j_start:.3f} end={j_end:.3f} target={target_qpos[j]:.3f}  "
+                      f"err={j_err:.3f} rad ({np.degrees(j_err):.1f}°)  "
+                      f"xarm err={err} warn={warn}")
 
     # ── public API ────────────────────────────────────────────────────────
 
@@ -269,12 +469,37 @@ class RealExecutor:
         self.arm.start(os.path.join(save_dir, "arm"))
 
     def stop_recording(self):
-        self.arm.stop()
-        self.hand.stop()
+        # Idempotent: each controller's .stop() will crash if save_path is None
+        # (i.e. recording was never started or already stopped). Guard each.
+        for ctrl in (self.arm, self.hand):
+            if getattr(ctrl, "save_path", None) is not None:
+                ctrl.stop()
 
     def _log_state(self, state):
         ts = datetime.datetime.now().isoformat()
         self.state_timestamps.append({"state": state, "time": ts})
+
+    def _make_monitor(self, thresh_nm: float = 15.0, model_path: str = None,
+                      watch_joints=(1, 2),
+                      sustained_ticks: int = 100,
+                      startup_blank_s: float = 0.5) -> "ContactMonitor":
+        """Construct a ContactMonitor for the current arm. Caller should call
+        monitor.warmup(...) once the arm is static at the desired baseline pose.
+        Defaults: 15 Nm threshold, 1s sustained — robust against motion-induced
+        tau spikes; real collisions still fire (ratio >> 1 instantly)."""
+        xarm_handle = self.arm.arm   # raw XArmAPI
+        # Ensure the report mode is set so _joints_torque is populated.
+        try:
+            xarm_handle.set_report_tau_or_i(1)
+            xarm_handle.set_collision_sensitivity(0)
+        except Exception:
+            pass
+        return ContactMonitor(
+            xarm_handle, model_path,
+            watch_joints=watch_joints, thresh_nm=thresh_nm,
+            sustained_ticks=sustained_ticks,
+            startup_blank_s=startup_blank_s, dt=self.dt,
+        )
 
     def execute(self, plan_result: PlanResult, lift_height: float = 0.10):
         """
@@ -298,14 +523,36 @@ class RealExecutor:
 
         sl = self.squeeze_level
 
-        # 1. Return to init pose (joint 0 first)
+        # 1. Return to init pose — full sequential reset, not just joint 0.
+        #    If the previous cycle's reset cut short, joints 1-5 could be off
+        #    too. Order [1, 2, 5, 0, 3, 4] mirrors the reset/clear-view order.
         self._log_state("init")
-        self._move_joint_sequential(self._xarm_init[:6], [0])
+        order = [1, 2, 5, 0, 3, 4]
+        if self.arm.get_data()["qpos"][1] < self._xarm_init[1]:
+            order = [2, 1, 5, 0, 3, 4]
+        self._move_joint_sequential(self._xarm_init[:6], order, threshold=0.06)
+        init_err = float(np.linalg.norm(self.arm.get_data()["qpos"]
+                                        - self._xarm_init[:6]))
+        if init_err > 0.1:
+            raise RuntimeError(
+                f"execute(): init step finished with err={init_err:.3f} > 0.1 "
+                f"— arm not at XARM_INIT, refusing to approach. "
+                f"final_qpos={self.arm.get_data()['qpos'].round(3)}"
+            )
+        # Threshold raised from 15→25 Nm because free-space approach motion
+        # naturally produces tau_dev ~20Nm on joint 2 (shoulder) from inertia
+        # + Coriolis effects the tau_model under-predicts. False positives
+        # were aborting trials before any actual contact.
+        monitor = self._make_monitor(thresh_nm=25.0, sustained_ticks=50)
+        print("[executor] warming up approach contact monitor (1s static)...")
+        monitor.warmup(seconds=1.0)
+        print(f"[executor] approach baseline tau = {monitor._baseline.round(2)}  "
+              f"(thresh=25Nm, sustained=0.5s)")
 
-        # 2. Approach trajectory
+        # 2. Approach trajectory (contact-monitored).
         self._log_state("approach")
         hand_traj = np.array([self._convert(traj[i, 6:]) for i in range(len(traj))])
-        self._move_joints(traj[:, :6], hand_traj)
+        self._move_joints(traj[:, :6], hand_traj, monitor=monitor)
 
         # 3. Pregrasp
         self._log_state("pregrasp")
@@ -322,7 +569,9 @@ class RealExecutor:
             self._move_hand(s_hand)
             time.sleep(0.01)
 
-        # 6. Lift
+        # 6. Lift — no contact monitor: arm is now carrying the object so the
+        #    empty-arm baseline is invalid for tau_dev. place() does its own
+        #    baseline at the lifted pose.
         self._log_state("lift")
         lift_pose = wrist_ee.copy()
         lift_pose[2, 3] += lift_height
@@ -332,46 +581,35 @@ class RealExecutor:
         return s_hand
 
     def place(self, plan_result: PlanResult, lift_height: float = 0.10,
-              overshoot: float = 0.05,
+              overshoot: float = 0.0,
               mcc_model_path: str = None,
               descend_time_s: float = 8.0,
               total_time_s: float = 12.0,
               log_path: str = None) -> dict:
-        """Descend with mcc_minimal admittance control. Target = lift_height +
-        overshoot below current z; arm yields naturally on table/object contact
-        via learned tau-model admittance loop.
+        """Descend with mcc_minimal admittance control. Target z = lift_pose -
+        (lift_height + overshoot) — i.e. with overshoot=0, the arm targets the
+        original grasp z (where the object came from). Overshoot can be set >0
+        to bias the motion downward past the original z if contact_stop is
+        unreliable, but with the tau-model contact check this is usually 0.
 
-        Hands the arm off from paradex's XArmController to a fresh XArmAPI for
-        the mcc loop, then re-inits paradex after."""
-        import sys
+        paradex's XArmController control_loop stays alive (so its recording
+        keeps running); mcc only computes q_ref and writes to xarm_ctrl.action,
+        which paradex sends. On contact (tau_ext > threshold) we freeze and break."""
         from pathlib import Path
 
         if not plan_result.success:
             return {"descended": 0.0, "stopped_on_contact": False, "target": 0.0}
 
         if mcc_model_path is None:
-            mcc_model_path = str(Path.home() / "mcc_minimal" / "results"
-                                 / "tau_model_inspire_left.pt")
-
-        from paradex.io.robot_controller.xarm_controller import homo2cart
+            mcc_model_path = str(Path.home() / "shared_data" / "AutoDex"
+                                 / "weights" / "tau_model" / "inspire_left.pt")
 
         self._log_state("place")
         target_descend = lift_height + overshoot
-        start_q = self.arm.get_data()["qpos"][:6].copy().astype(np.float64)
-        current_pos = self.arm.get_data()["position"].copy()
-
-        # Compute target cart + IK via xarm SDK before disconnecting.
-        target_pos = current_pos.copy()
-        target_pos[2, 3] -= target_descend
-        target_cart = homo2cart(target_pos)  # [x_mm, y_mm, z_mm, r_rad, p_rad, y_rad]
-        code, target_q_deg = self.arm.arm.get_inverse_kinematics(
-            target_cart.tolist(), input_is_radian=True, return_is_radian=False)
-        if code != 0:
-            print(f"[place] IK failed for descent target (code={code}). aborting place.")
-            self._log_state("place_done")
-            return {"descended": 0.0, "stopped_on_contact": False, "target": target_descend,
-                    "reason": "ik_failed"}
-        target_q = np.deg2rad(np.asarray(target_q_deg[:6], dtype=np.float64))
+        start_pose = self.arm.get_data()["position"].copy()   # 4x4 homo, link6 in world
+        current_pos = start_pose.copy()
+        target_pose = start_pose.copy()
+        target_pose[2, 3] -= target_descend                   # straight down in world z
 
         # Adapter: paradex's control thread keeps running (so its recording
         # continues), but mcc's writes are redirected to xarm_ctrl.action and
@@ -383,12 +621,10 @@ class RealExecutor:
         xarm_handle.set_report_tau_or_i(1)
         xarm_handle.set_collision_sensitivity(0)
 
-        # Import mcc_minimal (only tau model loading + input encoding).
-        mcc_dir = str(Path.home() / "mcc_minimal")
-        if mcc_dir not in sys.path:
-            sys.path.insert(0, mcc_dir)
+        # Tau model (copied from mcc_minimal/fit_tau_model.py; self-contained,
+        # only depends on numpy + torch).
         import torch  # noqa: E402
-        from fit_tau_model import load_model, build_input  # noqa: E402
+        from autodex.executor.tau_model import load_model, build_input
 
         print(f"[place] loading mcc model: {mcc_model_path}")
         model = load_model(mcc_model_path)
@@ -397,31 +633,40 @@ class RealExecutor:
         # on contact (tau_ext > threshold), freeze q_des at current pose (paradex
         # holds it) and break. No yield, no bounce.
         DT = 0.01
-        LOOP_HZ = 100
         FILTER_ALPHA = 0.1
         QDOT_SMOOTH_ALPHA = 0.1
         WARMUP_SEC = 1.0
         # baseline noise per joint (Nm) — from mcc DEADBAND_J. Contact threshold
         # is some multiplier above this.
         DEADBAND_J = np.array([3.0, 3.0, 3.0, 1.0, 2.0, 0.5])
-        CONTACT_MULT = 3.0
+        # 10 Nm on the watched joints (2, 3) — deadband is 3 Nm there, so
+        # mult = 10/3.
+        CONTACT_MULT = 10.0 / 3.0
         CONTACT_THRESH = DEADBAND_J * CONTACT_MULT
+        # Same constants mcc uses to convert _joints_torque (raw current in
+        # whatever units xarm reports) to Nm. tau_motor = I * KT * GEAR.
+        KT = np.array([0.067, 0.067, 0.0573, 0.0573, 0.056, 0.056])
+        GEAR = np.full(6, 100.0)
 
         def _read():
             _, q_deg = xarm_handle.get_servo_angle()
             q = np.deg2rad(np.asarray(q_deg[:6], dtype=np.float64))
-            # tau_motor from stream (paradex has report_type='real' on the XArmAPI)
-            KT_GEAR = 1.0  # mcc applies this internally; for raw stream both sides cancel in tau_ext
-            tau = np.asarray(xarm_handle._arm._joints_torque[:6], dtype=np.float64)
+            # tau_motor: raw _joints_torque × KT × GEAR → Nm. Matches what the
+            # MLP was trained against in mcc's stream source path.
+            I = np.asarray(xarm_handle._arm._joints_torque[:6], dtype=np.float64)
+            tau = I * KT * GEAR
             return q, tau
 
-        def _push_action(q_cmd):
+        def _push_pose(pose4x4):
+            """Push 4x4 link6 pose. paradex's control_loop sees non-(6,) shape
+            and routes through set_servo_cartesian_aa — internal IK tracks
+            current pose continuously, no arbitrary elbow flip."""
             with xarm_ctrl.lock:
-                xarm_ctrl.action = q_cmd.astype(np.float64)
+                xarm_ctrl.action = pose4x4.astype(np.float64)
                 xarm_ctrl.is_servo = True
 
-        # Make sure tau reporting is on and start with paradex holding start_q.
-        _push_action(start_q)
+        # Hold start_pose during warmup.
+        _push_pose(start_pose)
 
         # Warmup: prime tau_filt at hold pose.
         tau_filt = np.zeros(6)
@@ -446,15 +691,20 @@ class RealExecutor:
                 tau_hat = model.predict_full(torch.from_numpy(x)).numpy()
             tau_ext = tau_hat - tau_motor
             tau_filt = FILTER_ALPHA * tau_ext + (1 - FILTER_ALPHA) * tau_filt
-            _push_action(start_q)
+            _push_pose(start_pose)
             time.sleep(DT)
-        print(f"[place] warmup done. baseline tau_filt = {tau_filt.round(2)}")
+        # Pose-dependent baseline (MLP residual + any reading offset). Subtract
+        # this from later tau_filt so the contact check only sees DEVIATIONS.
+        tau_baseline = tau_filt.copy()
+        print(f"[place] warmup done. baseline tau_filt = {tau_baseline.round(2)}  (subtracted from now on)")
         print(f"[place] contact threshold per joint = {CONTACT_THRESH.round(2)}")
 
         # Descend loop with contact stop.
         log = [] if log_path else None
         contact = False
         contact_t = None
+        sustained = 0
+        last_print_t = -1.0
         t0 = time.time()
         next_t = t0
         while time.time() - t0 < total_time_s:
@@ -480,27 +730,49 @@ class RealExecutor:
             tau_ext = tau_hat - tau_motor
             tau_filt = FILTER_ALPHA * tau_ext + (1 - FILTER_ALPHA) * tau_filt
 
-            # Check contact.
-            if not contact and np.any(np.abs(tau_filt) > CONTACT_THRESH):
+            # Contact check: only on joints 2 and 3 (shoulder/elbow — most
+            # informative for downward contact). Skip first STARTUP_BLANK_S to
+            # avoid warmup->descend dynamics spike. Require SUSTAINED_TICKS
+            # consecutive ticks above threshold so single-tick noise doesn't fire.
+            STARTUP_BLANK_S = 0.5
+            SUSTAINED_TICKS = 8
+            CONTACT_JOINTS = (1, 2)   # 0-indexed: joints 2 and 3
+            tau_dev = tau_filt - tau_baseline
+            ratio = np.abs(tau_dev) / np.maximum(CONTACT_THRESH, 1e-6)
+            ratio_watch = ratio[list(CONTACT_JOINTS)]
+            crossed = bool(np.any(ratio_watch > 1.0))
+            if crossed and t > STARTUP_BLANK_S:
+                sustained += 1
+            else:
+                sustained = 0
+            # Periodic dump every 0.2s so torque evolution is visible.
+            if t - last_print_t >= 0.2:
+                last_print_t = t
+                print(f"[place] t={t:5.2f}s  tau_dev={tau_dev.round(2)}  "
+                      f"ratio={ratio.round(2)}", flush=True)
+
+            if (not contact) and (sustained >= SUSTAINED_TICKS):
                 contact = True
                 contact_t = t
-                worst = int(np.argmax(np.abs(tau_filt)))
-                print(f"[place] CONTACT detected at t={t:.2f}s — "
-                      f"joint {worst+1} tau_ext={tau_filt[worst]:.2f}Nm "
-                      f"(thresh {CONTACT_THRESH[worst]:.2f})")
-                # Freeze at current pose; break.
-                _push_action(q)
+                print(f"[place] CONTACT at t={t:.2f}s (watching joints {[i+1 for i in CONTACT_JOINTS]})")
+                print(f"  tau_dev = {tau_dev.round(2)}")
+                print(f"  ratio   = {ratio.round(2)}")
+                print(f"  thresh  = {CONTACT_THRESH.round(2)}")
+                # Freeze at current actual pose; break.
+                cur_pose = self.arm.get_data()["position"].copy()
+                _push_pose(cur_pose)
                 if log is not None:
-                    log.append((t, *q, *tau_filt, 1))
+                    log.append((t, *q, *tau_dev, 1))
                 break
 
-            # Lerp q_des down toward target. After contact this wouldn't run.
+            # Cartesian lerp: translate z toward target, rotation held constant.
             alpha = min(1.0, max(0.0, t / descend_time_s))
-            q_des = (1 - alpha) * start_q + alpha * target_q
-            _push_action(q_des)
+            pose_des = start_pose.copy()
+            pose_des[2, 3] = (1 - alpha) * start_pose[2, 3] + alpha * target_pose[2, 3]
+            _push_pose(pose_des)
 
             if log is not None:
-                log.append((t, *q, *tau_filt, 0))
+                log.append((t, *q, *tau_dev, 0))
 
         if not contact:
             print(f"[place] no contact within {total_time_s}s — reached target. final pose held.")
@@ -528,15 +800,15 @@ class RealExecutor:
             descended = current_pos[2, 3] - final_z
         else:
             descended = float("nan")
-        stopped = descended < target_descend - 0.005 if descended == descended else False
         print(f"[place] descended {descended*1000:.1f}mm of target {target_descend*1000:.0f}mm "
-              f"({'yielded on contact' if stopped else 'reached target'})")
+              f"({'contact stop' if contact else 'reached target window'})")
 
         # paradex thread never stopped; it's been forwarding mcc's q_ref the
         # whole time, so no re-init needed. Just leave its action at last q_ref.
 
         self._log_state("place_done")
-        return {"descended": float(descended), "stopped_on_contact": bool(stopped),
+        return {"descended": float(descended), "stopped_on_contact": bool(contact),
+                "contact_t_s": float(contact_t) if contact_t is not None else None,
                 "target": float(target_descend)}
 
     def release(self, plan_result: PlanResult):
@@ -563,6 +835,134 @@ class RealExecutor:
         self._move_hand(g_hand)
         time.sleep(0.01)
         self._move_hand(pg_hand)
+
+    def reset(self, plan_result: PlanResult,
+              planner, scene_cfg: dict) -> dict:
+        """Automated reset AFTER release. Required: planner + scene_cfg.
+          0. Snapshot placed object pose from CURRENT wrist (rigid-grasp).
+             place() may stop early on contact, so the actual resting pose
+             can differ from the planned grasp pose.
+          1. Re-plan retract with the placed object as obstacle. Start hand
+             config = pregrasp (real hand state after release). Goal = init
+             state. Planner gradually opens fingers along a collision-free
+             path away from the object. Raises if planning fails.
+          2. Execute traj (arm + planner-generated hand portion).
+          3. Final joint-0 unwind to land exactly on XARM_INIT."""
+        t_start = time.time()
+        log = {"start": datetime.datetime.now().isoformat(), "steps": {}}
+        if not plan_result.success:
+            log["skipped"] = True
+            return log
+
+        from autodex.utils.conversion import cart2se3, se32cart
+
+        # 0. Snapshot released object pose (robot frame) under rigid-grasp.
+        T_obj_grasp = cart2se3(scene_cfg["mesh"]["target"]["pose"])
+        T_obj_in_wrist = np.linalg.inv(plan_result.wrist_se3) @ T_obj_grasp
+        T_wrist_now = self.arm.get_data()["position"] @ self._link6_to_wrist
+        released_obj_pose = T_wrist_now @ T_obj_in_wrist
+        log["T_wrist_grasp"] = plan_result.wrist_se3.tolist()
+        log["T_wrist_at_reset_start"] = T_wrist_now.tolist()
+        log["T_obj_in_wrist"] = T_obj_in_wrist.tolist()
+        log["released_obj_pose_robot"] = released_obj_pose.tolist()
+
+        # 1. Re-plan retract — hand stays at pregrasp (real state).
+        self._log_state("arm_retract")
+        t1 = time.time()
+        new_scene = dict(scene_cfg)
+        new_scene["mesh"] = dict(scene_cfg.get("mesh", {}))
+        new_scene["mesh"]["target"] = dict(scene_cfg["mesh"]["target"])
+        new_scene["mesh"]["target"]["pose"] = se32cart(released_obj_pose).tolist()
+        cur_qpos = self.arm.get_data()["qpos"]
+        # Goal arm = XARM_INIT but joint 0 rotated -60° so the arm parks out
+        # of the cameras' view (matches RSS_2026 run_auto_v2 clear_view_pose).
+        clear_view_arm = self._xarm_init.copy()
+        clear_view_arm[0] -= np.deg2rad(60.0)
+        t_plan0 = time.time()
+        retract_traj = planner.plan_js_to_init(
+            new_scene, cur_qpos,
+            start_hand_qpos=plan_result.pregrasp_pose,
+            goal_arm_qpos=clear_view_arm[:6],
+        )
+        log["steps"]["replan_s"] = round(time.time() - t_plan0, 2)
+        if retract_traj is None:
+            log["retract_mode"] = "replan_failed"
+            raise RuntimeError(
+                "reset(): plan_js_to_init returned None — retract not safe. "
+                "Inspect placed object pose / scene_cfg."
+            )
+        log["retract_mode"] = "replanned"
+
+        # 2. Execute: arm + planner-generated hand portion. No contact monitor
+        #    here — retract trajectory is high-acceleration and tau_model's
+        #    qdot extrapolation outside training distribution gives false
+        #    positives that cut the traj short mid-flight.
+        arm_traj = retract_traj[:, :6]
+        hand_traj = np.array([self._convert(retract_traj[i, 6:])
+                              for i in range(len(retract_traj))])
+        self._move_joints(arm_traj, hand_traj)
+        log["steps"]["arm_retract_s"] = round(time.time() - t1, 2)
+
+        # 3. Verify final pose — RAISE if arm didn't actually reach
+        #    clear_view (stall, partial traj, etc.) so the caller doesn't
+        #    silently start the next cycle from a bad pose.
+        final_qpos = self.arm.get_data()["qpos"]
+        err = float(np.linalg.norm(final_qpos - clear_view_arm[:6]))
+        log["final_qpos_err"] = err
+        self._log_state("reset_done")
+        log["total_s"] = round(time.time() - t_start, 2)
+        if err > 0.1:
+            raise RuntimeError(
+                f"reset(): retract finished with final_qpos_err={err:.3f} > 0.1. "
+                f"final_qpos={final_qpos.round(3)}  clear_view={clear_view_arm[:6].round(3)}"
+            )
+        return log
+
+    def reset_fallback(self, plan_result: PlanResult) -> dict:
+        """Reset path for failed grasps (approach contact or charuco fail).
+        Open hand to hand_init, then sequentially move arm to clear_view
+        (joint 0 -60° from XARM_INIT) via [1, 2, 5, 0, 3, 4] (mirror if
+        joint 1 below init). No planner involvement."""
+        t_start = time.time()
+        log = {"start": datetime.datetime.now().isoformat(), "steps": {}}
+        if not plan_result.success:
+            log["skipped"] = True
+            return log
+
+        init_hand = self._convert(self._hand_init)
+
+        # 1. Open hand to hand_init.
+        self._log_state("hand_init")
+        t1 = time.time()
+        self._move_hand(init_hand)
+        time.sleep(0.5)
+        log["steps"]["hand_open_s"] = round(time.time() - t1, 2)
+
+        # 2. Sequential arm retract to clear-view pose (joint 0 -60° from
+        #    XARM_INIT). No contact monitor — sequential motion has high
+        #    per-joint acceleration that breaks the tau_model baseline.
+        self._log_state("clear_view")
+        t1 = time.time()
+        clear_view = self._xarm_init.copy()
+        clear_view[0] -= np.deg2rad(60.0)
+        execute_order = [1, 2, 5, 0, 3, 4]
+        if self.arm.get_data()["qpos"][1] < self._xarm_init[1]:
+            execute_order = [2, 1, 5, 0, 3, 4]
+        self._move_joint_sequential(clear_view[:6], execute_order, threshold=0.06)
+        log["steps"]["arm_retract_s"] = round(time.time() - t1, 2)
+
+        final_qpos = self.arm.get_data()["qpos"]
+        err = float(np.linalg.norm(final_qpos - clear_view[:6]))
+        log["final_qpos_err"] = err
+        log["retract_mode"] = "fallback_sequential"
+        self._log_state("reset_done")
+        log["total_s"] = round(time.time() - t_start, 2)
+        if err > 0.1:
+            # Don't abort — fixed-trajectory sequential retract. Caller decides
+            # what to do with a partial result via log["final_qpos_err"].
+            print(f"[reset_fallback] WARNING: final_qpos_err={err:.3f} > 0.1  "
+                  f"final={final_qpos.round(3)}  target={clear_view[:6].round(3)}")
+        return log
 
     def shutdown(self):
         self.arm.end()

@@ -72,56 +72,89 @@ class ScenePlanVisualizer(ViserViewer):
         # Meshes
         for name, data in self.scene_cfg.get("mesh", {}).items():
             pose_se3 = self._pose7d_to_se3(data["pose"])
-            mesh = trimesh.load(data["file_path"])
+            mesh_path = data["file_path"]
+            # For the target object, prefer the raw textured mesh over the
+            # planning simplified.obj so we see the actual color/texture.
+            # raw_mesh path: {obj_root}/raw_mesh/{obj}.obj where obj_root is
+            # the parent of processed_data/.
+            if name == "target" and "processed_data" in mesh_path:
+                obj_root_dir = mesh_path.split("/processed_data/")[0]
+                obj_name_guess = os.path.basename(obj_root_dir)
+                raw = os.path.join(obj_root_dir, "raw_mesh",
+                                   f"{obj_name_guess}.obj")
+                if os.path.exists(raw):
+                    mesh_path = raw
+            # process=False preserves materials/texture in trimesh load.
+            try:
+                mesh = trimesh.load(mesh_path, process=False)
+            except Exception:
+                mesh = trimesh.load(mesh_path)
             if isinstance(mesh, trimesh.Scene):
                 mesh = mesh.dump(concatenate=True)
             self.add_object(f"mesh_{name}", mesh, pose_se3)
-            if name == "target":
-                self.change_color(f"mesh_{name}", [0.2, 0.8, 0.2, 0.5])
-            else:
+            # Only override color for non-target meshes (obstacles).
+            # Target keeps its native texture/material.
+            if name != "target":
                 self.change_color(f"mesh_{name}", [0.6, 0.4, 0.2, 0.5])
 
     def _add_trajectory(self, result):
-        """Add trajectory robot + grasp hand."""
+        """Add trajectory robot + grasp hand + auto-playing playback."""
         # Full robot trajectory
         self.add_robot("traj_robot", self._urdf_full)
-
-        # Show final pose
         traj = result.traj
-        self.robot_dict["traj_robot"].update_cfg(traj[-1])
 
-        # Grasp hand at wrist
+        # Grasp hand at wrist (target — green, semi-transparent)
         urdf_hand = self._urdf_hand
         self.add_robot("grasp_hand", urdf_hand, pose=result.wrist_se3)
         self.robot_dict["grasp_hand"].update_cfg(result.grasp_pose)
         self.change_color("grasp_hand", [0.0, 1.0, 0.0, 0.6])
 
-        # Trajectory slider
-        n_frames = len(traj)
-        self.traj_slider = self.server.gui.add_slider(
-            "Trajectory Frame",
-            min=0, max=n_frames - 1, step=1, initial_value=n_frames - 1,
-        )
-
-        @self.traj_slider.on_update
-        def _on_frame(_):
-            idx = int(self.traj_slider.value)
-            self.robot_dict["traj_robot"].update_cfg(traj[idx])
+        # Register the trajectory with the base-class player so the
+        # built-in "Playing" checkbox auto-advances through frames.
+        # add_player() creates gui_timestep/gui_playing/gui_framerate.
+        self.add_player()
+        self.add_traj("plan", {"traj_robot": traj})
+        self.update_scene(0)   # snap robot to start of trajectory
 
     def start_viewer(self, use_thread=False):
         self.add_frame("base_frame", np.eye(4))
+        self._running = True
         if use_thread:
             import threading
-            t = threading.Thread(target=self._block, daemon=True)
+            t = threading.Thread(target=self._loop, daemon=True)
             t.start()
         else:
-            self._block()
+            self._loop()
 
-    def _block(self):
+    def stop_viewer(self):
+        """Signal the loop thread to exit, then close the viser server."""
+        self._running = False
+        import time
+        time.sleep(0.05)   # let loop thread observe the flag
+        try:
+            self.server.stop()
+        except Exception:
+            pass
+
+    def _loop(self):
+        """Auto-advance trajectory when gui_playing is True (base class update()).
+
+        update() already paces itself via gui_framerate, so don't add extra
+        sleeps here — that would make playback jerky.
+        """
+        import time
         print(f"Visualizer running at http://localhost:{self.port}")
-        while True:
-            import time
-            time.sleep(1)
+        while getattr(self, "_running", True):
+            try:
+                if hasattr(self, "gui_playing"):
+                    self.update()       # paces at 1/gui_framerate.value
+                else:
+                    time.sleep(0.1)
+            except RuntimeError as e:
+                # Server closed mid-update — exit loop cleanly.
+                if "Event loop is closed" in str(e):
+                    return
+                raise
 
     def add_candidates(self, wrist_se3, grasp_pose, filtered):
         """Show candidate hands with slider. Red = filtered, Green = valid."""

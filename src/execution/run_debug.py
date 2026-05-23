@@ -42,6 +42,7 @@ from autodex.executor.real import RealExecutor
 from autodex.perception.init_orchestrator import InitOrchestrator
 
 from src.execution.scene_cfg import pose_world_to_scene_cfg
+from src.execution.label import auto_label_charuco
 from src.execution.run_auto import (
     DEFAULT_PC_LIST, ASSETS_BASE, MESH_BASE, CAM_PARAM_ROOT, _load_calib,
 )
@@ -190,7 +191,7 @@ def main():
         planner = GraspPlanner(hand=args.hand)
         result = planner.plan(
             scene_cfg, args.obj, args.grasp_version,
-            skip_done=(args.scene == "table"),
+            skip_done=False,
             success_only=args.success_only, hand=args.hand,
         )
         timing["plan_s"] = round(time.time() - t0, 2)
@@ -201,7 +202,7 @@ def main():
             wrist_se3, _, grasp_pose, filtered = planner.get_candidates(
                 scene_cfg, args.obj, args.grasp_version,
                 success_only=args.success_only,
-                skip_done=(args.scene == "table"), hand=args.hand,
+                skip_done=False, hand=args.hand,
             )
             fv = ScenePlanVisualizer(scene_cfg, None, port=args.port_viser, hand=args.hand)
             fv.add_candidates(wrist_se3, grasp_pose, filtered)
@@ -227,7 +228,7 @@ def main():
         cand_wrist, _, cand_grasp, cand_filtered = planner.get_candidates(
             scene_cfg, args.obj, args.grasp_version,
             success_only=args.success_only,
-            skip_done=(args.scene == "table"), hand=args.hand,
+            skip_done=False, hand=args.hand,
         )
         vis.add_candidates(cand_wrist, cand_grasp, cand_filtered)
         vis.start_viewer(use_thread=True)
@@ -249,8 +250,28 @@ def main():
         executor = RealExecutor(hand_name=args.hand)
         s_hand = executor.execute(result)         # grasp + lift (object held up)
 
-        # ↓ Label image capture goes here — object lifted, table area exposed.
-        # (auto-label via charuco visibility is a follow-up; for now, manual label.)
+        # Auto-label probe (info only — does NOT decide trial success).
+        label_rel = os.path.join("shared_data", "AutoDex", "experiment",
+                                 args.exp_name, sub, args.obj, dir_idx,
+                                 "label_at_lift", "raw")
+        label_abs = os.path.join(img_dir, "label_at_lift", "raw", "images")
+        # Pause continuous stream so rcc.start("image", ...) is accepted.
+        try:
+            rcc.stop()
+        except Exception:
+            pass
+        rcc.start("image", False, label_rel)
+        rcc.stop()
+        time.sleep(0.5)   # let capture PCs flush their PNGs to NFS
+        auto_succ, label_info = auto_label_charuco(label_abs, required_board="1")
+        if label_info.get("reason"):
+            print(f"[auto-label] FAILED ({label_info['reason']})  dir={label_abs}")
+        else:
+            print(f"[auto-label] success={auto_succ}  "
+                  f"board1 covered {label_info['covered']}/{label_info['expected']}  "
+                  f"(missing IDs: {label_info['missing_ids']})")
+        # Resume stream for any future operations (next trial would need it).
+        rcc.start("stream", False, fps=args.stream_fps)
 
         place_info = executor.place(
             result,
@@ -258,21 +279,18 @@ def main():
         )
         timing["execution_states"] = executor.state_timestamps
         timing["place"] = place_info
-
-        # Label.
-        while True:
-            label = input("Success? [y/n]: ").strip().lower()
-            if label in ("y", "n"):
-                break
+        timing["auto_label"] = label_info
 
         executor.release(result)
         if s_hand is not None:
             np.save(os.path.join(img_dir, "squeeze_hand.npy"), s_hand)
 
+        # success=None: trial just iterates, no manual/auto pass/fail decision.
         trial_result = {
             "dir_idx": dir_idx,
             "scene_type": args.scene,
-            "success": (label == "y"),
+            "success": None,
+            "auto_label": label_info,
             "scene_info": result.scene_info,
             "candidate_idx": result.timing.get("candidate_idx") if result.timing else None,
             "timing": timing,
@@ -288,7 +306,7 @@ def main():
                 sei[0], sei[1], sei[2], "result.json",
             )
             with open(cand_result_path, "w") as f:
-                json.dump({"success": label == "y", "dir_idx": dir_idx}, f)
+                json.dump({"success": None, "dir_idx": dir_idx}, f)
 
         print(f"Result saved to {img_dir}/result.json")
         executor.shutdown()
