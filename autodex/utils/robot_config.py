@@ -32,10 +32,9 @@ INSPIRE_LINK6_TO_WRIST = np.array([
     [0, 0, 0, 1]
 ])
 
-# inspire_left URDF chain (link6 -> wrist -> base_link) composes Rx(π) · Rz(π) = Ry(π),
-# plus a 4.5mm x-offset in the arm_to_hand joint.
+# inspire_left URDF chain (link6 -> wrist -> base_link) composes Rx(π) · Rz(π) = Ry(π).
 INSPIRE_LEFT_LINK6_TO_WRIST = np.array([
-    [-1, 0, 0, 0.0045],
+    [-1, 0, 0, 0],
     [ 0, 1, 0, 0],
     [ 0, 0,-1, 0.035],
     [ 0, 0, 0, 1]

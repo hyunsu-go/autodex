@@ -104,11 +104,39 @@ if __name__ == "__main__":
                         help="Override object root dir (default: ~/shared_data/RSS2026_Mingi/object/paradex)")
     parser.add_argument("--seed_offset", type=int, default=0,
                         help="Start index for saved seed dirs (default 0). Use to append additional seeds without overwriting existing ones.")
+    parser.add_argument("--seed_num", type=int, default=None,
+                        help="Override seed_num from config (number of grasp seeds per scene).")
+    parser.add_argument("--exp_name", type=str, default=None,
+                        help="Override exp_name from config (output subdir under bodex_outputs/{robot}/).")
+    parser.add_argument("--scene_type", type=str, nargs="+", default=None,
+                        help="Override scene_type list from config (restrict to these scene types).")
+    parser.add_argument("--scene_filter_file", type=str, default=None,
+                        help="JSON file mapping {scene_type: [scene_id, ...]} to restrict dataset to specific scenes. "
+                             "Used by adaptive orchestrator for per-scene retry.")
+    parser.add_argument("--task_f", type=float, nargs=3, default=None,
+                        help="Override grasp_cfg.task_dict.f (primary wrench direction, world frame). "
+                             "E.g. --task_f 0 0 -1 for gravity.")
+    parser.add_argument("--task_gamma", type=float, default=None,
+                        help="Override grasp_cfg.task_dict.gamma (robustness cone half-angle deg). "
+                             "E.g. --task_gamma 30 for narrow cone around f.")
+    parser.add_argument("--seed", type=int, default=123,
+                        help="Random seed (numpy / torch / random).")
 
     setup_logger("warn")
 
     args = parser.parse_args()
     manip_config_data = load_yaml(join_path(get_manip_configs_path(), args.manip_cfg_file))
+
+    if args.seed_num is not None:
+        manip_config_data["seed_num"] = args.seed_num
+    if args.exp_name is not None:
+        manip_config_data["exp_name"] = args.exp_name
+    if args.scene_type is not None:
+        manip_config_data["world"]["scene_type"] = args.scene_type
+    if args.task_f is not None:
+        manip_config_data.setdefault("grasp_cfg", {}).setdefault("task_dict", {})["f"] = list(args.task_f)
+    if args.task_gamma is not None:
+        manip_config_data.setdefault("grasp_cfg", {}).setdefault("task_dict", {})["gamma"] = args.task_gamma
 
     # Override obj_list from file if provided
     if args.obj_list_file:
@@ -124,10 +152,16 @@ if __name__ == "__main__":
     log_dir = os.path.join(REPO_ROOT, "logging", "grasp_generation")
     logger = _setup_logging(save_dir, log_dir)
 
-    seed = 123
+    seed = args.seed
     np.random.seed(seed)
     torch.manual_seed(seed)
     random.seed(seed)
+
+    scene_filter = None
+    if args.scene_filter_file is not None:
+        import json as _json
+        with open(args.scene_filter_file) as _f:
+            scene_filter = {st: set(ids) for st, ids in _json.load(_f).items()}
 
     # output_dir for skip check: save_dir already includes exp_name,
     # but ParadexDataset prepends version again, so pass parent dir
@@ -138,6 +172,7 @@ if __name__ == "__main__":
         seed_offset=args.seed_offset,
         output_dir=save_dir_parent,
         obj_root_dir=args.obj_root_dir,
+        scene_filter=scene_filter,
     )
 
     logger.info(f"START config={args.manip_cfg_file} exp={exp_name} parallel={args.parallel_world} output={save_dir}")

@@ -369,7 +369,7 @@ def save_wall_scene(obj_name):
     os.makedirs(os.path.join(out_path, "wall"), exist_ok=True)
 
     params = {
-        "z_rotation_deg": [0, 75, 150, 225, 300],
+        "z_rotation_deg": [0, 72, 144, 216, 288],
         "gap": [0.0, 0.05],
     }
     combos = list(product(params["z_rotation_deg"], params["gap"]))
@@ -403,7 +403,7 @@ def save_shelf_scene(obj_name):
     os.makedirs(os.path.join(out_path, "shelf"), exist_ok=True)
 
     params = {
-        "z_rotation_deg": [0, 75, 150, 225, 300],
+        "z_rotation_deg": [0, 72, 144, 216, 288],
         "gap": [0.0, 0.05],
         "up": [True, False],
         "side": [True, False],

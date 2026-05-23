@@ -406,7 +406,7 @@ class BODexBrowser(ViserViewer):
         # Scene IDs from candidate data
         scene_dir = os.path.join(self._data_root(), self.current_obj, self.current_scene_type)
         scenes = self._list_dirs(scene_dir)
-        scenes = sorted(scenes, key=lambda x: int(x) if x.isdigit() else x)
+        scenes = sorted(scenes, key=lambda x: (0, int(x)) if x.isdigit() else (1, x))
         self.scene_idx_selector.options = scenes if scenes else ["(none)"]
         if scenes:
             self.scene_idx_selector.value = scenes[0]
@@ -426,7 +426,8 @@ class BODexBrowser(ViserViewer):
         )
         self.all_grasp_dirs = self._list_dirs(scene_path)
         self.all_grasp_dirs = sorted(
-            self.all_grasp_dirs, key=lambda x: int(x) if x.isdigit() else x
+            self.all_grasp_dirs,
+            key=lambda x: (0, int(x)) if x.isdigit() else (1, x),
         )
 
         if not self.all_grasp_dirs:

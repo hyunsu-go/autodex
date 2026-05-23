@@ -12,9 +12,8 @@ import transforms3d
 from scipy.spatial.transform import Rotation as R
 import shapely.geometry as geom
 
-from paradex.visualization.visualizer.viser import ViserViewer
-from rsslib.conversion import cart2se3
 from autodex.utils.path import obj_path
+from autodex.utils.conversion import cart2se3
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 COLORS = {
@@ -258,15 +257,6 @@ def get_shelf_scene(obj_name, tabletop_pose, obb_info, z_rotation_deg, gap,
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-available_objects = sorted([
-    d for d in os.listdir(obj_path)
-    if os.path.isdir(os.path.join(obj_path, d, "scene"))
-])
-
-print(f"Found {len(available_objects)} objects with scenes")
-
-vis = ViserViewer()
-
 
 def load_mesh(path):
     mesh = trimesh.load(path)
@@ -485,29 +475,52 @@ def update_scene_types():
 
 
 # ── GUI ────────────────────────────────────────────────────────────────────────
-with vis.server.gui.add_folder("Scene Grid"):
-    obj_dropdown = vis.server.gui.add_dropdown(
-        "Object",
-        options=tuple(available_objects),
-        initial_value=available_objects[0] if available_objects else "",
-    )
-    scene_type_dropdown = vis.server.gui.add_dropdown(
-        "Scene Type",
-        options=("",),
-        initial_value="",
-    )
-    load_btn = vis.server.gui.add_button("Load Grid")
 
-@obj_dropdown.on_update
-def _(_) -> None:
-    update_scene_types()
+vis = None
+available_objects = []
+obj_dropdown = None
+scene_type_dropdown = None
 
-@load_btn.on_click
-def _(_) -> None:
-    load_grid()
 
-if available_objects:
-    update_scene_types()
-    load_grid()
+def _main():
+    from paradex.visualization.visualizer.viser import ViserViewer
+    global vis, available_objects, obj_dropdown, scene_type_dropdown
 
-vis.start_viewer()
+    available_objects = sorted([
+        d for d in os.listdir(obj_path)
+        if os.path.isdir(os.path.join(obj_path, d, "scene"))
+    ])
+    print(f"Found {len(available_objects)} objects with scenes")
+
+    vis = ViserViewer()
+
+    with vis.server.gui.add_folder("Scene Grid"):
+        obj_dropdown = vis.server.gui.add_dropdown(
+            "Object",
+            options=tuple(available_objects),
+            initial_value=available_objects[0] if available_objects else "",
+        )
+        scene_type_dropdown = vis.server.gui.add_dropdown(
+            "Scene Type",
+            options=("",),
+            initial_value="",
+        )
+        load_btn = vis.server.gui.add_button("Load Grid")
+
+    @obj_dropdown.on_update
+    def _(_) -> None:
+        update_scene_types()
+
+    @load_btn.on_click
+    def _(_) -> None:
+        load_grid()
+
+    if available_objects:
+        update_scene_types()
+        load_grid()
+
+    vis.start_viewer()
+
+
+if __name__ == "__main__":
+    _main()

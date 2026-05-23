@@ -120,8 +120,14 @@ INSPIRE_F1_MIMIC_MAP = [
 ]
 
 
-def eval_single_grasp(mj, wrist_se3, pregrasp_joints, grasp_joints, mimic_map=None, apply_r_delta=True):
-    """Returns (success, traj_data)."""
+def eval_single_grasp(mj, wrist_se3, pregrasp_joints, grasp_joints, mimic_map=None, apply_r_delta=True, gravity_dir=None):
+    """Returns (success, traj_data).
+
+    gravity_dir: 3-vector — direction (in object canonical frame, which is also
+      MuJoCo world frame here since obj is placed at identity pose) along which
+      gravity acts on the object at its tabletop_pose. Defaults to -world-z
+      (object at canonical orientation = upright).
+    """
     # Expand mimic joints if needed
     pregrasp_joints = _expand_mimic_joints(pregrasp_joints, mimic_map)
     grasp_joints = _expand_mimic_joints(grasp_joints, mimic_map)
@@ -173,26 +179,25 @@ def eval_single_grasp(mj, wrist_se3, pregrasp_joints, grasp_joints, mimic_map=No
         mj.control_hand_step(step_inner=10)
         _rec("squeeze")
 
-    # 4. Force test
-    for fi, fdir in enumerate(FORCE_DIRECTIONS):
-        mj.reset_pose_qpos(pregrasp_qpos, obj_pose)
-        mj.control_hand_with_interp(pregrasp_qpos, grasp_qpos)
-        mj.control_hand_with_interp(grasp_qpos, squeeze_qpos)
+    # 4. Force test — single direction = gravity in object frame at tabletop_pose
+    g = np.asarray(gravity_dir if gravity_dir is not None else [0, 0, -1], dtype=float)
+    fdir = np.zeros(6)
+    fdir[:3] = g
+    mj.reset_pose_qpos(pregrasp_qpos, obj_pose)
+    mj.control_hand_with_interp(pregrasp_qpos, grasp_qpos)
+    mj.control_hand_with_interp(grasp_qpos, squeeze_qpos)
 
-        mj.set_ext_force_on_obj(fdir * FORCE_SCALE * OBJ_MASS)
-
-        pre_obj = mj.get_obj_pose().copy()
-        for _ in range(50):
-            mj.control_hand_step(step_inner=10)
-            _rec(f"force_{fi}")
-
-            cur_obj = mj.get_obj_pose()
-            dp, da = np_get_delta_qpos(pre_obj, cur_obj)
-            if dp > TRANS_THRE or da > ANGLE_THRE:
-                mj.set_ext_force_on_obj(np.zeros(6))
-                return False, traj
-
-        mj.set_ext_force_on_obj(np.zeros(6))
+    mj.set_ext_force_on_obj(fdir * FORCE_SCALE * OBJ_MASS)
+    pre_obj = mj.get_obj_pose().copy()
+    for _ in range(50):
+        mj.control_hand_step(step_inner=10)
+        _rec("force_gravity")
+        cur_obj = mj.get_obj_pose()
+        dp, da = np_get_delta_qpos(pre_obj, cur_obj)
+        if dp > TRANS_THRE or da > ANGLE_THRE:
+            mj.set_ext_force_on_obj(np.zeros(6))
+            return False, traj
+    mj.set_ext_force_on_obj(np.zeros(6))
 
     return True, traj
 
@@ -321,6 +326,68 @@ def run_sim_filter(hand, version, obj_name, bodex_root, candidate_root, viewer=F
 
         print(f"  Collision: {n_coll_pass}/{n_coll_total} passed")
 
+    # --- Step 1.5: Squeeze contact check + per-scene gravity_dir ---
+    # Skip seeds whose squeeze pose doesn't make contact with the object —
+    # if fingers don't touch object at squeeze, force closure is impossible.
+    contact_valid = {}        # seed_dir -> bool (True = touches object at squeeze)
+    gravity_dir_per_scene = {}  # (scene_type, scene_id) -> 3-vector in obj canonical frame
+    if not sim_only:
+        print(f"  [1.5/2] Squeeze contact check...")
+        n_contact_pass = 0
+        n_contact_total = 0
+        for (scene_type, scene_id), seeds in tqdm(scene_seeds.items(), desc="  squeeze check", leave=False):
+            scene_json = os.path.join(obj_data_path, obj_name, "scene", scene_type, f"{scene_id}.json")
+            if not os.path.exists(scene_json):
+                for seed, sd in seeds:
+                    contact_valid[sd] = False
+                continue
+            scene_cfg = json.load(open(scene_json))["scene"]
+
+            obj_se3 = cart2se3(scene_cfg["mesh"]["target"]["pose"])
+            R = obj_se3[:3, :3]
+            # world -z expressed in object canonical frame (object placed at identity in MuJoCo)
+            gravity_dir_per_scene[(scene_type, scene_id)] = R.T @ np.array([0.0, 0.0, -1.0])
+
+            obj_only_cfg = {"mesh": {"target": scene_cfg["mesh"]["target"]}, "cuboid": {}}
+            obj_only_world = _to_curobo_world(obj_only_cfg)
+
+            wrist_list, squeeze_list, sds = [], [], []
+            for seed, sd in seeds:
+                if not coll_valid.get(sd, False):
+                    contact_valid[sd] = False
+                    continue
+                try:
+                    wrist_se3 = np.load(os.path.join(sd, "wrist_se3.npy"))
+                    pregrasp = np.load(os.path.join(sd, "pregrasp_pose.npy"))
+                    grasp = np.load(os.path.join(sd, "grasp_pose.npy"))
+                except FileNotFoundError:
+                    contact_valid[sd] = False
+                    continue
+                squeeze = grasp * 2 - pregrasp
+                wrist_list.append(obj_se3 @ wrist_se3)
+                squeeze_list.append(squeeze)
+                sds.append(sd)
+
+            if not wrist_list:
+                continue
+            try:
+                # World-only collision (ignores self-collision) — True means hand spheres touch object
+                collided = planner._check_world_collision_only(obj_only_world, np.array(wrist_list), np.array(squeeze_list))
+            except Exception:
+                import traceback; traceback.print_exc()
+                collided = np.zeros(len(wrist_list), dtype=bool)
+            for i, sd in enumerate(sds):
+                cv = bool(collided[i])
+                contact_valid[sd] = cv
+                n_contact_total += 1
+                if cv:
+                    n_contact_pass += 1
+        print(f"  Squeeze contact: {n_contact_pass}/{n_contact_total} passed")
+    else:
+        # sim_only: assume all collision-pass seeds also have contact (skip filter)
+        for sd in coll_valid:
+            contact_valid[sd] = coll_valid[sd]
+
     if coll_only:
         return n_coll_total, n_coll_pass
 
@@ -364,6 +431,16 @@ def run_sim_filter(hand, version, obj_name, bodex_root, candidate_root, viewer=F
             pbar.set_postfix_str(f"succ={success_count} rate={success_count/total*100:.1f}%")
             continue
 
+        # Skip seeds whose squeeze pose has no object contact (force closure impossible)
+        if not contact_valid.get(seed_dir, False):
+            total += 1
+            with open(result_path, "w") as f:
+                json.dump({"success": False, "hand": hand, "version": version,
+                           "reason": "no_object_contact"}, f)
+            pbar.update(1)
+            pbar.set_postfix_str(f"succ={success_count} rate={success_count/total*100:.1f}%")
+            continue
+
         wrist_se3 = np.load(os.path.join(seed_dir, "wrist_se3.npy"))
         pregrasp = np.load(os.path.join(seed_dir, "pregrasp_pose.npy"))
         grasp = np.load(os.path.join(seed_dir, "grasp_pose.npy"))
@@ -375,8 +452,12 @@ def run_sim_filter(hand, version, obj_name, bodex_root, candidate_root, viewer=F
         else:
             mimic_map = None
         apply_r_delta = (hand == "allegro")  # R_DELTA is allegro-specific
+        gravity_dir = gravity_dir_per_scene.get((scene_type, scene_id))
         try:
-            succ, traj_data = eval_single_grasp(mj, wrist_se3, pregrasp, grasp, mimic_map=mimic_map, apply_r_delta=apply_r_delta)
+            succ, traj_data = eval_single_grasp(mj, wrist_se3, pregrasp, grasp,
+                                                mimic_map=mimic_map,
+                                                apply_r_delta=apply_r_delta,
+                                                gravity_dir=gravity_dir)
         except Exception as e:
             import traceback
             traceback.print_exc()

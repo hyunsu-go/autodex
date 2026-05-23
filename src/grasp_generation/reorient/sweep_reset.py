@@ -44,7 +44,7 @@ from plan_reset import (  # noqa: E402
 
 def discover_pairs(obj_name: str, hand: str, h_cm: int):
     """List all (i, j) directories under candidates/{hand}/reset/{obj}/{h_cm}/."""
-    base = _reset_candidate_path(hand) / "reset" / obj_name / str(h_cm)
+    base = _reset_candidate_path(hand) / "reset" / obj_name / f"reorient_{h_cm}"
     if not base.exists():
         return []
     pairs = []

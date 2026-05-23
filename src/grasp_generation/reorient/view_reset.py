@@ -191,17 +191,14 @@ def run_multi_explorer(vis: ViserViewer, urdf_fk: yourdfpy.URDF, ee_link: str,
     cell_info = vis.server.gui.add_text("Cell", initial_value="", disabled=True)
     status_info = vis.server.gui.add_text("Status", initial_value="", disabled=True)
 
-    def reload_pair():
-        name = pair_dropdown.value
-        xs, tzs, cells, _summary = pair_caches[name]
-        x_slider.max = max(len(xs) - 1, 0); x_slider.value = 0
-        tz_slider.max = max(len(tzs) - 1, 0); tz_slider.value = 0
-        return xs, tzs, cells
-
     state = {"xs": None, "tzs": None, "cells": None}
 
     def load_current_cell():
+        if state["xs"] is None:
+            return  # state not ready yet (slider callback during init)
         xs, tzs, cells = state["xs"], state["tzs"], state["cells"]
+        if not xs or not tzs:
+            status_info.value = "empty grid"; vis.clear_traj(); return
         xi = min(x_slider.value, len(xs) - 1)
         tzi = min(tz_slider.value, len(tzs) - 1)
         x, tz = xs[xi], tzs[tzi]
@@ -220,9 +217,19 @@ def run_multi_explorer(vis: ViserViewer, urdf_fk: yourdfpy.URDF, ee_link: str,
             )
             vis.add_traj(ph, {"robot": robot_traj}, {"object": obj_traj})
 
+    def reload_pair():
+        """Update state with current pair's xs/tzs/cells, then resize sliders.
+        State must be assigned BEFORE mutating slider.max / .value so that any
+        on_update callbacks triggered see consistent state."""
+        name = pair_dropdown.value
+        xs, tzs, cells, _summary = pair_caches[name]
+        state["xs"], state["tzs"], state["cells"] = xs, tzs, cells
+        x_slider.max = max(len(xs) - 1, 0); x_slider.value = 0
+        tz_slider.max = max(len(tzs) - 1, 0); tz_slider.value = 0
+
     @pair_dropdown.on_update
     def _(_):
-        state["xs"], state["tzs"], state["cells"] = reload_pair()
+        reload_pair()
         load_current_cell()
 
     @x_slider.on_update
@@ -230,7 +237,7 @@ def run_multi_explorer(vis: ViserViewer, urdf_fk: yourdfpy.URDF, ee_link: str,
     @tz_slider.on_update
     def _(_): load_current_cell()
 
-    state["xs"], state["tzs"], state["cells"] = reload_pair()
+    reload_pair()
     load_current_cell()
 
 

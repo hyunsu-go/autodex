@@ -74,7 +74,13 @@ class WorldConfigDataset(Dataset):
         }
 
 class ParadexDataset(Dataset):
-    def __init__(self, obj_list=[], scene_type_list=[], batch_size=1, version="", seed_offset=0, output_dir=None, obj_root_dir=None):
+    def __init__(self, obj_list=[], scene_type_list=[], batch_size=1, version="", seed_offset=0, output_dir=None, obj_root_dir=None, scene_filter=None):
+        """
+        scene_filter: optional dict {scene_type: set(scene_id_no_ext)}. When set,
+        restricts the dataset to scenes whose filename (without .json) is in
+        scene_filter[scene_type]. Used by the adaptive orchestrator for
+        per-scene retry batching.
+        """
         from autodex.utils.path import obj_path as _autodex_obj_path
         self.obj_root_dir = obj_root_dir or _autodex_obj_path
         self.output_dir = output_dir
@@ -86,14 +92,17 @@ class ParadexDataset(Dataset):
         for obj_name in self.obj_list:
             obj_dir = os.path.join(self.obj_root_dir, obj_name)
             obj_info_dict = load_json(os.path.join(obj_dir, "processed_data", "info", "simplified.json"))
-            
+
             obb_length = np.linalg.norm(obj_info_dict["obb"]) / 2
             gravity_center = np.array(obj_info_dict["gravity_center"])
 
             for scene_type in scene_type_list:
                 scene_list = os.listdir(os.path.join(obj_dir, "scene", scene_type))
-                
+                allowed = scene_filter.get(scene_type) if scene_filter else None
+
                 for scene_name in scene_list:
+                    if allowed is not None and scene_name.split('.')[0] not in allowed:
+                        continue
                     save_path = os.path.join(self.output_dir or bodex_path, version, obj_name, scene_type, scene_name.split('.')[0])
                     skip = True
                     for i in range(batch_size):
@@ -144,12 +153,12 @@ def _world_config_collate_fn(list_data):
     return ret_data
 
 
-def get_world_config_dataloader(configs, batch_size, seed_num, version="", seed_offset=0, output_dir=None, obj_root_dir=None):
+def get_world_config_dataloader(configs, batch_size, seed_num, version="", seed_offset=0, output_dir=None, obj_root_dir=None, scene_filter=None):
     if configs["type"] == "scene_cfg":
         dataset = WorldConfigDataset(**configs)
 
     elif configs["type"] == "paradex":
-        dataset = ParadexDataset(configs.get("obj_list", []), configs.get("scene_type", []), seed_num, version, seed_offset, output_dir=output_dir, obj_root_dir=obj_root_dir)
+        dataset = ParadexDataset(configs.get("obj_list", []), configs.get("scene_type", []), seed_num, version, seed_offset, output_dir=output_dir, obj_root_dir=obj_root_dir, scene_filter=scene_filter)
 
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, collate_fn=_world_config_collate_fn

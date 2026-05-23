@@ -10,7 +10,7 @@ particle_file: "particle_grasp_debug.yml"
 gradient_file: "gradient_grasp_fc.yml"
 
 exp_name: 'table_only'
-seed_num: 100
+seed_num: 2000
 seeder_cfg:
   obj_sample:
     num: 1024

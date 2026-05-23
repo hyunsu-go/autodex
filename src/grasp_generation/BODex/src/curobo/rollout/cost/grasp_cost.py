@@ -136,8 +136,9 @@ class GraspCost(CostBase, GraspCostConfig):
     def reset(self, gravity_center, obb_length):
         self.contact_stage = 0
         self.count = 0
+        self.contact_query_mode = None  # force update_perturb_info() on next stage transition
         self.GraspEnergy.reset(gravity_center, obb_length)
-        return 
+        return
     
     def _get_contact_stage(self, opt_progress):
         assert self.contact_strategy is not None

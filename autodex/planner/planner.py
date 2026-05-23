@@ -196,6 +196,28 @@ class GraspPlanner:
         self_coll = (d_self > 0).cpu().numpy()
         return world_coll | self_coll
 
+    def _check_world_collision_only(self, world_cfg: dict, wrist_se3: np.ndarray, joints: np.ndarray) -> np.ndarray:
+        """bool array (N,): True = hand spheres collide with world (object/obstacles).
+        Self-collision is IGNORED — caller uses this for "is hand in contact with X?" queries."""
+        rw_config = RobotWorldConfig.load_from_config(
+            self._hand_cfg,
+            WorldConfig.from_dict(world_cfg),
+            collision_activation_distance=0.0,
+            tensor_args=self._tensor_args,
+        )
+        rw = RobotWorld(rw_config)
+        n_dof = rw.kinematics.get_dof()
+        if n_dof == len(joints[0]) + 6:
+            q = np.array([se32action(w, g) for w, g in zip(wrist_se3, joints)])
+        else:
+            from autodex.utils.conversion import se32cart
+            q = np.array([np.concatenate([se32cart(w), g]) for w, g in zip(wrist_se3, joints)])
+            if q.shape[1] != n_dof:
+                q = joints
+        q_t = torch.tensor(q, dtype=torch.float32, device=self._tensor_args.device)
+        d_world, _ = rw.get_world_self_collision_distance_from_joints(q_t)
+        return (d_world > 0).cpu().numpy()
+
     def check_collision_per_sphere(self, world_cfg: dict, wrist_se3: np.ndarray, pregrasp: np.ndarray,
                                     compute_esdf: bool = False):
         """Per-sphere world collision.

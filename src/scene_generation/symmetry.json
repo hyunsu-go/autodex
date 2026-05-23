@@ -1,0 +1,9 @@
+{
+  "_comment": "Per-object rotational symmetry. axis is in object frame; type=revolute means continuous rotation around axis leaves geometry invariant.",
+  "pepper_tuna":       {"axis": "y", "type": "revolute"},
+  "pepper_tuna_light": {"axis": "y", "type": "revolute"},
+  "pepsi":             {"axis": "y", "type": "revolute"},
+  "pepsi_light":       {"axis": "y", "type": "revolute"},
+  "donut":             {"axis": "y", "type": "revolute"},
+  "servingbowl_small": {"axis": "y", "type": "revolute"}
+}

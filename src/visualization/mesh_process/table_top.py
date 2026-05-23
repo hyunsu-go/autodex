@@ -5,15 +5,14 @@ import json
 import glob
 import trimesh
 
-from paradex.utils.path import shared_dir
 from paradex.visualization.visualizer.viser import ViserViewer
 
-from autodex.utils.path import robot_configs_path, get_object_mesh
+from autodex.utils.path import obj_path as autodex_obj_path, robot_configs_path, get_object_mesh
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--obj_path",
-    default=os.path.join(shared_dir, "RSS2026_Mingi", "object", "paradex"),
+    default=autodex_obj_path,
     help="Root dir holding object subdirs (paradex layout).",
 )
 cli_args = parser.parse_args()
@@ -58,10 +57,17 @@ def clear_scene():
 def load_object(obj_name):
     clear_scene()
 
-    mesh_path = os.path.join(
-        obj_base_dir, obj_name, "processed_data", "mesh", "simplified.obj"
+    # Prefer textured raw mesh; fall back to simplified mesh if missing.
+    raw_mesh_path = os.path.join(
+        obj_base_dir, obj_name, "raw_mesh", f"{obj_name}.obj"
     )
-    mesh = trimesh.load(mesh_path, force="mesh")
+    if os.path.exists(raw_mesh_path):
+        mesh = trimesh.load(raw_mesh_path, process=False)
+    else:
+        mesh = trimesh.load(
+            os.path.join(obj_base_dir, obj_name, "processed_data", "mesh", "simplified.obj"),
+            process=False,
+        )
 
     # Load OBB from simplified.json
     simplified_json_path = os.path.join(

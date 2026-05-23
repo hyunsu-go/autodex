@@ -95,7 +95,7 @@ def find_place_for_seed(planner, *, wrist_se3_obj, grasp_q,
 
 
 def discover_pairs(obj_name: str, hand: str, h_cm: int):
-    base = _reset_candidate_path(hand) / "reset" / obj_name / str(h_cm)
+    base = _reset_candidate_path(hand) / "reset" / obj_name / f"reorient_{h_cm}"
     if not base.exists():
         return []
     pairs = []
@@ -182,7 +182,7 @@ def main():
             continue
 
         candidate_dir = (_reset_candidate_path(args.hand) / "reset"
-                         / args.obj / str(args.h_cm) / f"{i}_{j}")
+                         / args.obj / f"reorient_{args.h_cm}" / f"{i}_{j}")
         n_ok = 0
         pair_t0 = time.time()
         for k, seed in enumerate(seed_ids):

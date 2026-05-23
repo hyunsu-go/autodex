@@ -90,9 +90,9 @@ def load_candidates_object_frame(obj_name: str, hand: str, h_cm: int, i: int, j:
     object frame. `places[k]` is the precomputed T_obj_end (4x4) for that seed
     if `place.npy` exists in the seed directory, else None.
 
-    Path layout: candidates/{hand}/reset/{obj}/{h_cm}/{i}_{j}/{seed}/
+    Path layout: candidates/{hand}/reset/{obj}/reorient_{h_cm}/{i}_{j}/{seed}/
     """
-    base = _reset_candidate_path(hand) / "reset" / obj_name / str(h_cm) / f"{i}_{j}"
+    base = _reset_candidate_path(hand) / "reset" / obj_name / f"reorient_{h_cm}" / f"{i}_{j}"
     if not base.exists():
         raise FileNotFoundError(f"No candidates at {base}")
     wrist_o, preg, grasp_f, seeds, places = [], [], [], [], []
@@ -254,6 +254,10 @@ def _plan_js(planner: GraspPlanner, q_start: np.ndarray, q_goal: np.ndarray):
 
 
 FLOOR_Z = 0.0  # table top — object mesh vertices must stay >= this during carry
+# Robot base "no-go" cylinder around world origin (xarm6 mount pedestal).
+# Object vertices in this region during carry = collision with robot base.
+BASE_CYL_R = 0.18
+BASE_CYL_Z_MAX = 0.50
 
 
 def _fk_ee_traj(urdf: "yourdfpy.URDF", joint_traj: np.ndarray, ee_link: str) -> np.ndarray:
@@ -266,20 +270,33 @@ def _fk_ee_traj(urdf: "yourdfpy.URDF", joint_traj: np.ndarray, ee_link: str) -> 
     return out
 
 
+def _carry_object_world_verts(ee_traj: np.ndarray, wrist_se3_obj: np.ndarray,
+                                obj_verts: np.ndarray) -> np.ndarray:
+    """Transform object vertices to world for every frame of carry trajectory.
+    Returns (T, V, 3)."""
+    inv_w = np.linalg.inv(wrist_se3_obj)
+    obj_T = ee_traj @ inv_w
+    R = obj_T[:, :3, :3]
+    t = obj_T[:, :3, 3]
+    return np.einsum("tij,vj->tvi", R, obj_verts) + t[:, None, :]
+
+
 def _carry_object_min_z(ee_traj: np.ndarray, wrist_se3_obj: np.ndarray,
                          obj_verts: np.ndarray) -> float:
-    """Min z over all transformed object vertices across the carry trajectory.
+    """Min z over all transformed object vertices across the carry trajectory."""
+    v_world = _carry_object_world_verts(ee_traj, wrist_se3_obj, obj_verts)
+    return float(v_world[..., 2].min())
 
-    T_obj(t) = ee(t) @ inv(wrist_se3_obj)
-    vert_world(t) = T_obj(t).R @ vert + T_obj(t).t
-    """
-    inv_w = np.linalg.inv(wrist_se3_obj)
-    obj_T = ee_traj @ inv_w  # (T,4,4)
-    R = obj_T[:, :3, :3]      # (T,3,3)
-    t = obj_T[:, :3, 3]       # (T,3)
-    # (T, V, 3) = (T,3,3) @ (V,3).T  reshaped — use einsum
-    v_world_z = np.einsum("tij,vj->tvi", R, obj_verts)[..., 2] + t[:, None, 2]
-    return float(v_world_z.min())
+
+def _carry_object_hits_base(ee_traj: np.ndarray, wrist_se3_obj: np.ndarray,
+                             obj_verts: np.ndarray) -> bool:
+    """True if any object vertex enters the robot base "no-go" cylinder
+    (radius BASE_CYL_R around world Z axis, z in [0, BASE_CYL_Z_MAX])."""
+    v_world = _carry_object_world_verts(ee_traj, wrist_se3_obj, obj_verts)
+    xy_dist = np.linalg.norm(v_world[..., :2], axis=-1)
+    z = v_world[..., 2]
+    inside = (xy_dist < BASE_CYL_R) & (z >= 0.0) & (z <= BASE_CYL_Z_MAX)
+    return bool(inside.any())
 
 
 def plan_one_seed(planner: GraspPlanner, *,
@@ -365,6 +382,8 @@ def plan_one_seed(planner: GraspPlanner, *,
                 obj_z_min = _carry_object_min_z(ee_tr, wrist_se3_obj, obj_verts)
                 if obj_z_min < FLOOR_Z:
                     return None, "object_below_floor_rotate"
+                if _carry_object_hits_base(ee_tr, wrist_se3_obj, obj_verts):
+                    return None, "object_hits_base_rotate"
 
         # Put-down only: depart + retract with placed object as obstacle.
         if full:
