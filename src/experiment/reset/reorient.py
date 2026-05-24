@@ -73,7 +73,7 @@ from autodex.perception.snapshot_orchestrator import SnapshotOrchestrator
 
 from curobo.geom.types import WorldConfig
 
-from src.execution.scene_cfg import pose_world_to_scene_cfg
+from src.execution.scene_cfg import pose_world_to_scene_cfg, CYLINDER_OBJECTS
 from src.execution.run_auto import (
     DEFAULT_PC_LIST, ASSETS_BASE, MESH_BASE, CAM_PARAM_ROOT, _load_calib,
 )
@@ -741,8 +741,17 @@ def main():
                         + TABLE_SURFACE_Z + LIFT_HEIGHT_M,
                 ])
                 scene_lift_pre = {"mesh": {}, "cuboid": dict(scene_cfg["cuboid"])}
-                X_GRID_PRE = np.arange(0.25, 0.55, 0.05)
+                X_GRID_PRE = np.arange(0.35, 0.55, 0.05)
                 YAW_GRID_PRE = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+                # Cylinder-symmetric objects: free DoF about object's +Y axis
+                # applied IN OBJECT FRAME: Rz(world_yaw) @ R_target @ Ry_local(cyl).
+                if args.obj in CYLINDER_OBJECTS:
+                    CYL_YAW_GRID_PRE = np.linspace(
+                        0, 2 * np.pi, 8, endpoint=False)
+                    CYL_AXIS_LOCAL = np.array([0.0, 1.0, 0.0])
+                else:
+                    CYL_YAW_GRID_PRE = None
+                    CYL_AXIS_LOCAL = None
 
                 world_approach = _to_curobo_world(scene_cfg)
                 planner._init_motion_gen(world_approach)
@@ -830,6 +839,8 @@ def main():
                         R_target_obj_world_pre, obj_target_pos_world_pre,
                         hold_hand_qpos=pregrasp_cand,
                         x_grid=X_GRID_PRE, yaw_grid=YAW_GRID_PRE,
+                        cyl_yaw_grid=CYL_YAW_GRID_PRE,
+                        cyl_axis_local=CYL_AXIS_LOCAL,
                         skip_plan=True)
                     sorted_cands = sorted_info.get("sorted_candidates", [])
                     x_center = 0.5 * (float(X_GRID_PRE[0]) + float(X_GRID_PRE[-1]))
@@ -842,13 +853,18 @@ def main():
                     last_reorient_fail = None
                     last_descent_fail = None
                     for sc in sorted_cands:
-                        sx, syaw = sc["x"], sc["yaw"]
+                        sx, syaw, scyl = sc["x"], sc["yaw"], sc["cyl_yaw"]
                         x1 = np.array([sx]); y1 = np.array([syaw])
+                        cyl1 = (np.array([scyl])
+                                if CYL_YAW_GRID_PRE is not None else None)
                         r_traj, r_info = planner.plan_obj_placement(
                             scene_lift_pre, cur_qpos_reorient, T_obj_in_wrist_cand,
                             R_target_obj_world_pre, obj_target_pos_world_pre,
                             hold_hand_qpos=pregrasp_cand,
-                            x_grid=x1, yaw_grid=y1, skip_plan=False)
+                            x_grid=x1, yaw_grid=y1,
+                            cyl_yaw_grid=cyl1,
+                            cyl_axis_local=CYL_AXIS_LOCAL,
+                            skip_plan=False)
                         if r_traj is None:
                             last_reorient_fail = (sc, r_info)
                             continue
@@ -857,7 +873,10 @@ def main():
                             scene_lift_pre, cur_qpos_descent, T_obj_in_wrist_cand,
                             R_target_obj_world_pre, obj_target_pos_descent,
                             hold_hand_qpos=pregrasp_cand,
-                            x_grid=x1, yaw_grid=y1, skip_plan=False)
+                            x_grid=x1, yaw_grid=y1,
+                            cyl_yaw_grid=cyl1,
+                            cyl_axis_local=CYL_AXIS_LOCAL,
+                            skip_plan=False)
                         if d_traj is None:
                             last_descent_fail = (sc, d_info)
                             continue
@@ -876,8 +895,15 @@ def main():
                             Rz_d = np.array([[cy_d, -sy_d, 0.0],
                                              [sy_d,  cy_d, 0.0],
                                              [0.0,   0.0,  1.0]])
+                            if CYL_AXIS_LOCAL is not None:
+                                R_cyl_d = R.from_rotvec(
+                                    CYL_AXIS_LOCAL * float(sc["cyl_yaw"])
+                                ).as_matrix()
+                            else:
+                                R_cyl_d = np.eye(3)
                             T_obj_reorient_end = np.eye(4)
-                            T_obj_reorient_end[:3, :3] = Rz_d @ R_target_obj_world_pre
+                            T_obj_reorient_end[:3, :3] = (
+                                Rz_d @ R_target_obj_world_pre @ R_cyl_d)
                             T_obj_reorient_end[0, 3] = float(sc["x"])
                             T_obj_reorient_end[1, 3] = 0.0
                             T_obj_reorient_end[2, 3] = (

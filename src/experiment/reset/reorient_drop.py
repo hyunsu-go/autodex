@@ -66,7 +66,7 @@ from autodex.executor.real import RealExecutor
 from autodex.perception.init_orchestrator import InitOrchestrator
 from autodex.perception.snapshot_orchestrator import SnapshotOrchestrator
 
-from src.execution.scene_cfg import pose_world_to_scene_cfg
+from src.execution.scene_cfg import pose_world_to_scene_cfg, CYLINDER_OBJECTS
 from src.execution.run_auto import (
     DEFAULT_PC_LIST, ASSETS_BASE, MESH_BASE, CAM_PARAM_ROOT, _load_calib,
 )
@@ -667,8 +667,18 @@ def main():
                       f"LIFT_HEIGHT_M={LIFT_HEIGHT_M:.4f})")
                 scene_lift_pre = {"mesh": {},
                                   "cuboid": dict(scene_cfg["cuboid"])}
-                X_GRID_PRE = np.arange(0.25, 0.55, 0.05)
+                X_GRID_PRE = np.arange(0.35, 0.55, 0.05)
                 YAW_GRID_PRE = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+                # Cylinder-symmetric objects: free DoF about the object's
+                # local +Y (symmetry) axis applied IN OBJECT FRAME. Final
+                # target rotation is Rz(world_yaw) @ R_target @ Ry_local(cyl).
+                if args.obj in CYLINDER_OBJECTS:
+                    CYL_YAW_GRID_PRE = np.linspace(
+                        0, 2 * np.pi, 8, endpoint=False)
+                    CYL_AXIS_LOCAL = np.array([0.0, 1.0, 0.0])
+                else:
+                    CYL_YAW_GRID_PRE = None
+                    CYL_AXIS_LOCAL = None
 
                 # Init motion_gen with obj-world for approach planning.
                 world_approach = _to_curobo_world(scene_cfg)
@@ -773,6 +783,8 @@ def main():
                         R_target_obj_world_pre, obj_target_pos_world_pre,
                         hold_hand_qpos=pregrasp_cand,
                         x_grid=X_GRID_PRE, yaw_grid=YAW_GRID_PRE,
+                        cyl_yaw_grid=CYL_YAW_GRID_PRE,
+                        cyl_axis_local=CYL_AXIS_LOCAL,
                         skip_plan=True)
                     sorted_cands = sorted_info.get("sorted_candidates", [])
                     # Re-sort: prefer x near grid center (further from robot
@@ -787,24 +799,32 @@ def main():
                     last_reorient_fail = None
                     last_descent_fail = None
                     for sc in sorted_cands:
-                        sx, syaw = sc["x"], sc["yaw"]
+                        sx, syaw, scyl = sc["x"], sc["yaw"], sc["cyl_yaw"]
                         x1 = np.array([sx]); y1 = np.array([syaw])
+                        cyl1 = (np.array([scyl])
+                                if CYL_YAW_GRID_PRE is not None else None)
                         # reorient at LIFT_HEIGHT
                         r_traj, r_info = planner.plan_obj_placement(
                             scene_lift_pre, cur_qpos_reorient, T_obj_in_wrist_cand,
                             R_target_obj_world_pre, obj_target_pos_world_pre,
                             hold_hand_qpos=pregrasp_cand,
-                            x_grid=x1, yaw_grid=y1, skip_plan=False)
+                            x_grid=x1, yaw_grid=y1,
+                            cyl_yaw_grid=cyl1,
+                            cyl_axis_local=CYL_AXIS_LOCAL,
+                            skip_plan=False)
                         if r_traj is None:
                             last_reorient_fail = (sc, r_info)
                             continue
-                        # descent at RELEASE_HEIGHT, same (x, yaw)
+                        # descent at RELEASE_HEIGHT, same (x, yaw, cyl_yaw)
                         cur_qpos_descent = r_traj[-1].copy()
                         d_traj, d_info = planner.plan_obj_placement(
                             scene_lift_pre, cur_qpos_descent, T_obj_in_wrist_cand,
                             R_target_obj_world_pre, obj_target_pos_descent,
                             hold_hand_qpos=pregrasp_cand,
-                            x_grid=x1, yaw_grid=y1, skip_plan=False)
+                            x_grid=x1, yaw_grid=y1,
+                            cyl_yaw_grid=cyl1,
+                            cyl_axis_local=CYL_AXIS_LOCAL,
+                            skip_plan=False)
                         if d_traj is None:
                             last_descent_fail = (sc, d_info)
                             continue
@@ -825,8 +845,15 @@ def main():
                             Rz_d = np.array([[cy_d, -sy_d, 0.0],
                                              [sy_d,  cy_d, 0.0],
                                              [0.0,   0.0,  1.0]])
+                            if CYL_AXIS_LOCAL is not None:
+                                R_cyl_d = R.from_rotvec(
+                                    CYL_AXIS_LOCAL * float(sc["cyl_yaw"])
+                                ).as_matrix()
+                            else:
+                                R_cyl_d = np.eye(3)
                             T_obj_reorient_end = np.eye(4)
-                            T_obj_reorient_end[:3, :3] = Rz_d @ R_target_obj_world_pre
+                            T_obj_reorient_end[:3, :3] = (
+                                Rz_d @ R_target_obj_world_pre @ R_cyl_d)
                             T_obj_reorient_end[0, 3] = float(sc["x"])
                             T_obj_reorient_end[1, 3] = 0.0
                             T_obj_reorient_end[2, 3] = (
@@ -945,14 +972,19 @@ def main():
                     "chosen_grasp_idx": chosen_cand_idx,
                     "chosen_x": pre_info["chosen_x"],
                     "chosen_yaw_deg": float(np.degrees(pre_info["chosen_yaw"])),
+                    "chosen_cyl_yaw_deg": float(np.degrees(
+                        pre_info.get("chosen_cyl_yaw", 0.0))),
                     "n_approach_fail_before_chosen": n_approach_fail,
                     "n_lift_fail_before_chosen": n_lift_fail,
                     "n_reorient_fail_before_chosen": n_reorient_fail,
                     "n_descent_fail_before_chosen": n_descent_fail,
                 }
+                cyl_str = (
+                    f" cyl={np.degrees(pre_info['chosen_cyl_yaw']):.0f}°"
+                    if CYL_YAW_GRID_PRE is not None else "")
                 print(f"    plan: {rec['timing']['plan_s']}s  cand#{chosen_cand_idx}  "
                       f"x={pre_info['chosen_x']:.3f} "
-                      f"yaw={np.degrees(pre_info['chosen_yaw']):.0f}°  "
+                      f"yaw={np.degrees(pre_info['chosen_yaw']):.0f}°{cyl_str}  "
                       f"(skipped approach={n_approach_fail}, lift={n_lift_fail}, "
                       f"reorient={n_reorient_fail}, descent={n_descent_fail})")
 

@@ -727,6 +727,7 @@ class GraspPlanner:
                             x_grid: np.ndarray,
                             yaw_grid: np.ndarray,
                             y_grid: np.ndarray = None,
+                            cyl_yaw_grid: np.ndarray = None,
                             skip_plan: bool = False,
                             ) -> tuple:
         """Search (x, yaw) for an IK-feasible placement and plan to it.
@@ -755,6 +756,16 @@ class GraspPlanner:
             hold_hand_qpos: (n_hand,) finger config to hold throughout.
             x_grid: (Nx,) world-frame x values to try.
             yaw_grid: (Nyaw,) yaw rotations around obj's vertical axis.
+            cyl_yaw_grid: optional (Ncyl,) rotations about the object's local
+                          symmetry axis (``cyl_axis_local``) applied IN OBJECT
+                          FRAME before world yaw, i.e. final rotation is
+                          ``Rz(yaw) @ R_target @ R_axis(cyl_axis_local, cyl_yaw)``.
+                          Use for cylinder-symmetric objects whose appearance is
+                          invariant under rotation about ``cyl_axis_local``.
+                          ``None`` (default) → singleton ``[0.0]`` (no extra DoF).
+            cyl_axis_local: (3,) unit axis in object frame. Required when
+                            ``cyl_yaw_grid`` is provided. For CYLINDER_OBJECTS
+                            this is the object's local +Y axis ``[0, 1, 0]``.
             skip_plan: if True, run only the (x, yaw) IK feasibility check
                        and return ``(None, info)`` with the chosen-best info
                        set but without calling plan_single_js. Use for cheap
@@ -783,9 +794,20 @@ class GraspPlanner:
             self._ik_solver.update_world(
                 WorldConfig.from_dict(world_cfg_no_target))
 
-        # 2. Build (x, y, yaw) candidate wrist targets.
+        # 2. Build (x, y, yaw, cyl_yaw) candidate wrist targets.
         if y_grid is None:
             y_grid = np.array([float(obj_target_pos_world[1])])
+        if cyl_yaw_grid is None:
+            cyl_yaw_grid = np.array([0.0])
+            R_cyl_list = [np.eye(3)]
+        else:
+            if cyl_axis_local is None:
+                raise ValueError(
+                    "cyl_axis_local required when cyl_yaw_grid is provided")
+            axis = np.asarray(cyl_axis_local, dtype=np.float64).reshape(3)
+            axis = axis / (np.linalg.norm(axis) + 1e-12)
+            R_cyl_list = [Rotation.from_rotvec(axis * float(theta)).as_matrix()
+                          for theta in cyl_yaw_grid]
         z_fixed = float(obj_target_pos_world[2])
         T_obj_in_wrist_inv = np.linalg.inv(T_obj_in_wrist)
         candidates_T_wrist = []
@@ -796,15 +818,18 @@ class GraspPlanner:
                     c, s = np.cos(yaw_try), np.sin(yaw_try)
                     R_z = np.array(
                         [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
-                    T_obj_target = np.eye(4)
-                    T_obj_target[:3, :3] = R_z @ R_target_obj_world
-                    T_obj_target[0, 3] = float(x_try)
-                    T_obj_target[1, 3] = float(y_try)
-                    T_obj_target[2, 3] = z_fixed
-                    T_wrist = T_obj_target @ T_obj_in_wrist_inv
-                    candidates_T_wrist.append(T_wrist)
-                    candidates_meta.append(
-                        (float(x_try), float(y_try), float(yaw_try)))
+                    for cyl_idx, cyl_try in enumerate(cyl_yaw_grid):
+                        R_cyl = R_cyl_list[cyl_idx]
+                        T_obj_target = np.eye(4)
+                        T_obj_target[:3, :3] = R_z @ R_target_obj_world @ R_cyl
+                        T_obj_target[0, 3] = float(x_try)
+                        T_obj_target[1, 3] = float(y_try)
+                        T_obj_target[2, 3] = z_fixed
+                        T_wrist = T_obj_target @ T_obj_in_wrist_inv
+                        candidates_T_wrist.append(T_wrist)
+                        candidates_meta.append(
+                            (float(x_try), float(y_try), float(yaw_try),
+                             float(cyl_try)))
         candidates_T_wrist = np.array(candidates_T_wrist)
         N = len(candidates_T_wrist)
 
@@ -854,10 +879,12 @@ class GraspPlanner:
         if skip_plan:
             best_local = int(order[0])
             best_idx = int(feasible[best_local])
-            chosen_x, chosen_y, chosen_yaw = candidates_meta[best_idx]
+            chosen_x, chosen_y, chosen_yaw, chosen_cyl_yaw = (
+                candidates_meta[best_idx])
             info["chosen_x"] = chosen_x
             info["chosen_y"] = chosen_y
             info["chosen_yaw"] = chosen_yaw
+            info["chosen_cyl_yaw"] = chosen_cyl_yaw
             info["best_arm_dist_rad"] = float(dists[best_local])
             info["T_wrist_target"] = candidates_T_wrist[best_idx]
             info["chosen_arm_qpos"] = ik_arm_qpos[best_idx].tolist()
@@ -868,6 +895,7 @@ class GraspPlanner:
                     "x": candidates_meta[int(feasible[i])][0],
                     "y": candidates_meta[int(feasible[i])][1],
                     "yaw": candidates_meta[int(feasible[i])][2],
+                    "cyl_yaw": candidates_meta[int(feasible[i])][3],
                     "arm_qpos": ik_arm_qpos[int(feasible[i])].tolist(),
                     "T_wrist": candidates_T_wrist[int(feasible[i])].tolist(),
                     "arm_dist_rad": float(dists[int(i)]),
@@ -895,10 +923,12 @@ class GraspPlanner:
             n_plan_attempts += 1
             ok, traj = self._refine_fingers(start_full, goal_full)
             if ok:
-                chosen_x, chosen_y, chosen_yaw = candidates_meta[cand_idx]
+                chosen_x, chosen_y, chosen_yaw, chosen_cyl_yaw = (
+                    candidates_meta[cand_idx])
                 info["chosen_x"] = chosen_x
                 info["chosen_y"] = chosen_y
                 info["chosen_yaw"] = chosen_yaw
+                info["chosen_cyl_yaw"] = chosen_cyl_yaw
                 info["best_arm_dist_rad"] = float(dists[local_i])
                 info["T_wrist_target"] = candidates_T_wrist[cand_idx]
                 info["chosen_arm_qpos"] = chosen_arm.tolist()
