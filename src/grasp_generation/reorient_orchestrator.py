@@ -35,8 +35,9 @@ from autodex.utils.path import obj_path as default_obj_path  # noqa: E402
 
 # --- Schedules ---
 H_SWEEP_CM = [0, 4]
-N_SWEEP = [200, 1000]
+N_SWEEP = [1000, 5000]
 SUCCESS_THRESHOLD = 5
+DEFAULT_SEEDS = [123, 456]  # one per N step; advances per-round to avoid duplicate sampling
 
 PARALLEL_PER_N = {200: 10, 1000: 2, 5000: 1}
 
@@ -114,7 +115,7 @@ def discover_yml_variants(hand: str, h_cm: int):
 # ---------------------------------------------------------------------------
 
 def run_bodex(yml_relpath, exp_name, obj_list_file, scene_type, scene_ids,
-              N, obj_root_dir=None):
+              N, seed, obj_root_dir=None):
     parallel = PARALLEL_PER_N.get(N, 1)
     bodex_dir = os.path.join(REPO_ROOT, "src", "grasp_generation", "BODex")
     filter_file = os.path.join("/tmp", f"reorient_scene_filter_{os.getpid()}.json")
@@ -128,6 +129,7 @@ def run_bodex(yml_relpath, exp_name, obj_list_file, scene_type, scene_ids,
         "--seed_num", str(N),
         "--exp_name", exp_name,
         "--scene_filter_file", filter_file,
+        "--seed", str(seed),
     ]
     if obj_root_dir:
         cmd += ["--obj_root_dir", obj_root_dir]
@@ -174,7 +176,8 @@ def count_passing(hand, exp_name, obj_name, scene_type, scene_id):
 # ---------------------------------------------------------------------------
 
 def process_obj(obj_name, hand, obj_root, obj_list_file,
-                h_sweep=H_SWEEP_CM, n_sweep=N_SWEEP, threshold=SUCCESS_THRESHOLD):
+                h_sweep=H_SWEEP_CM, n_sweep=N_SWEEP, threshold=SUCCESS_THRESHOLD,
+                seeds=DEFAULT_SEEDS):
     """Walk schedule of (h, variant, N). Per (i, j) scene, mark done when count >= threshold."""
     pairs = discover_pose_pairs(obj_name, obj_root)
     if not pairs:
@@ -198,15 +201,16 @@ def process_obj(obj_name, hand, obj_root, obj_list_file,
 
         for variant_tag, yml_relpath in variants:
             exp_name = f"reset_{h_cm}" if variant_tag == "base" else f"reset_{h_cm}_{variant_tag}"
-            for N in n_sweep:
+            for n_idx, N in enumerate(n_sweep):
                 active_ids = [sid for (h, sid), s in state.items()
                               if h == h_cm and not s["done"]]
                 if not active_ids:
                     break  # all (i, j) at this h satisfied
-                print(f"  [h={h_cm}] variant={variant_tag} N={N}: {len(active_ids)} active "
-                      f"(exp={exp_name})")
+                seed = seeds[n_idx % len(seeds)]
+                print(f"  [h={h_cm}] variant={variant_tag} N={N} seed={seed}: "
+                      f"{len(active_ids)} active (exp={exp_name})")
                 run_bodex(yml_relpath, exp_name, obj_list_file, scene_type,
-                          active_ids, N,
+                          active_ids, N, seed,
                           obj_root_dir=obj_root if obj_root != default_obj_path else None)
                 run_sim_filter(hand, exp_name, obj_name,
                                obj_root_dir=obj_root if obj_root != default_obj_path else None)
@@ -215,7 +219,7 @@ def process_obj(obj_name, hand, obj_root, obj_list_file,
                     s = state[(h_cm, sid)]
                     s["valid"] = max(s["valid"], cnt)
                     s["history"].append({"variant": variant_tag, "exp": exp_name,
-                                          "N": N, "valid": cnt})
+                                          "N": N, "seed": seed, "valid": cnt})
                     if cnt >= threshold:
                         s["done"] = True
                 cnts = sorted([state[(h_cm, sid)]["valid"] for sid in active_ids],
@@ -233,6 +237,9 @@ def main():
     parser.add_argument("--h_sweep", type=int, nargs="+", default=H_SWEEP_CM,
                         help="Lift heights in cm to try, in order (default: 0 4)")
     parser.add_argument("--n_sweep", type=int, nargs="+", default=N_SWEEP)
+    parser.add_argument("--seeds", type=int, nargs="+", default=DEFAULT_SEEDS,
+                        help="One seed per N-step (cycled). Different seeds across N rounds "
+                             "give genuinely new grasps instead of overlapping samples.")
     parser.add_argument("--threshold", type=int, default=SUCCESS_THRESHOLD)
     parser.add_argument("--output_dir", default=None,
                         help="Where to write reorient_summary.json (default: REPO/logging/reorient/)")
@@ -248,7 +255,7 @@ def main():
     print(f"\n=== {args.obj} ({args.hand}) ===")
     summary = process_obj(args.obj, args.hand, args.obj_root, obj_list_file,
                           h_sweep=args.h_sweep, n_sweep=args.n_sweep,
-                          threshold=args.threshold)
+                          threshold=args.threshold, seeds=args.seeds)
 
     summary_path = os.path.join(out_dir, f"{args.obj}_reorient_summary.json")
     with open(summary_path, "w") as f:
