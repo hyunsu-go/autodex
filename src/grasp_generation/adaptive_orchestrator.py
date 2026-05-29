@@ -37,7 +37,7 @@ from autodex.utils.path import obj_path as default_obj_path  # noqa: E402
 # --- Schedules ---
 GAP_SWEEP_WALL_SHELF = [0.02, 0.04, 0.06, 0.08]
 HEIGHT_SWEEP_BOX = [0.05, 0.08]
-N_SWEEP = [200, 1000, 5000]
+N_SWEEP = [200]
 SUCCESS_THRESHOLD = 5
 
 # BODex GPU memory budget — W_ks tensor scales as -w * N.
@@ -236,15 +236,31 @@ def run_bodex(hand, exp_name, scene_type, obj_name, seed_num, scene_ids,
         cmd += ["--obj_root_dir", obj_root_dir]
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = "0"
-    proc = subprocess.run(cmd, cwd=bodex_dir, env=env, capture_output=True, text=True)
+
+    import time
+    last_err = None
+    for attempt in range(4):  # up to 4 attempts (initial + 3 retries)
+        proc = subprocess.run(cmd, cwd=bodex_dir, env=env, capture_output=True, text=True)
+        if proc.returncode == 0:
+            try:
+                os.remove(filter_file)
+            except OSError:
+                pass
+            return proc.stdout
+        last_err = proc.stderr or proc.stdout
+        oom = "OutOfMemoryError" in last_err or "CUDA out of memory" in last_err
+        if oom and attempt < 3:
+            wait = 60 * (attempt + 1)  # 60s, 120s, 180s
+            print(f"[BODex OOM, attempt {attempt+1}/4] sleeping {wait}s and retrying...")
+            time.sleep(wait)
+            continue
+        break
     try:
         os.remove(filter_file)
     except OSError:
         pass
-    if proc.returncode != 0:
-        print(f"[BODex FAIL]\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
-        raise RuntimeError(f"BODex failed (rc={proc.returncode})")
-    return proc.stdout
+    print(f"[BODex FAIL]\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
+    raise RuntimeError(f"BODex failed (rc={proc.returncode})")
 
 
 def run_sim_filter(hand, exp_name, obj_name, obj_root_dir=None):

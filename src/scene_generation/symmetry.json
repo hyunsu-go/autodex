@@ -7,5 +7,6 @@
   "donut":             {"axis": "y", "type": "revolute"},
   "servingbowl_small": {"axis": "y", "type": "revolute"},
   "beige_brush":       {"axis": "y", "type": "revolute"},
-  "blue_alarm":        {"axis": [0.535245, -0.127493, -0.83502], "pivot": [0.0, 0.0, 0.0], "type": "discrete", "order": 2}
+  "blue_alarm":        {"axis": [0.535245, -0.127493, -0.83502], "pivot": [0.0, 0.0, 0.0], "type": "discrete", "order": 2},
+  "brown_ramen":       {"axis": "y", "type": "revolute"}
 }
