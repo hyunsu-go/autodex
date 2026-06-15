@@ -1,10 +1,11 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(bash /home/robot/AutoDex/scripts/gotrack_daemons.sh log capture1)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('src/experiment/reset/edit_spheres.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
+    ],
     "additionalDirectories": [
       "/home/robot/shared_data/AutoDex/content/assets/robot/allegro_description/xarm"
-    ],
-    "allow": [
-      "Bash(bash /home/robot/AutoDex/scripts/gotrack_daemons.sh log capture1)"
     ]
   }
 }
