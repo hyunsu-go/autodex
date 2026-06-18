@@ -37,7 +37,7 @@
   <header class="hero" id="top">
     <div class="wrap">
       <span class="eyebrow">Autonomous Real-World Data Collection</span>
-      <h1 class="title"><span class="grad">AutoDex</span>: Automated Dexterous Grasping Data Collection</h1>
+      <h1 class="title">AutoDex: Automated Dexterous Grasping Data Collection</h1>
       <p class="tagline">Collecting real-world-validated dexterous grasps &mdash; successes <em>and</em> failures &mdash; on a physical robot, with no human in the per-trial loop.</p>
 
       <div class="authors">
@@ -73,10 +73,10 @@
   <section style="padding:2.5rem 0;">
     <div class="wrap-wide">
       <div class="stat-strip">
-        <div class="stat reveal"><div class="num"><span data-target="71" data-dec="1" data-suffix="%">0</span></div><div class="lbl">success on constrained scenes</div></div>
-        <div class="stat reveal"><div class="num"><span data-target="1678" data-dec="0">0</span></div><div class="lbl">validated trajectories</div></div>
-        <div class="stat reveal"><div class="num"><span data-target="51" data-dec="0">0</span></div><div class="lbl">objects collected</div></div>
-        <div class="stat reveal"><div class="num"><span data-target="20" data-dec="0">0</span></div><div class="lbl">synchronized cameras</div></div>
+        <div class="stat"><div class="num">71.0%</div><div class="lbl">success on constrained scenes</div></div>
+        <div class="stat"><div class="num">1,678</div><div class="lbl">validated trajectories</div></div>
+        <div class="stat"><div class="num">51</div><div class="lbl">objects collected</div></div>
+        <div class="stat"><div class="num">20</div><div class="lbl">synchronized cameras</div></div>
       </div>
     </div>
   </section>
@@ -102,11 +102,11 @@
       <div class="cmp reveal">
         <div class="cmp-row">
           <div class="cmp-head"><span>Real-filtered grasps <span class="tag">(AutoDex)</span></span><span class="pct" style="color:var(--accent)">71.0%</span></div>
-          <div class="cmp-track"><div class="cmp-fill win" data-w="71"></div></div>
+          <div class="cmp-track"><div class="cmp-fill win" style="width:71%"></div></div>
         </div>
         <div class="cmp-row">
           <div class="cmp-head"><span>Sim-validated grasps</span><span class="pct" style="color:var(--muted)">33.0%</span></div>
-          <div class="cmp-track"><div class="cmp-fill lose" data-w="33"></div></div>
+          <div class="cmp-track"><div class="cmp-fill lose" style="width:33%"></div></div>
         </div>
         <p class="caption" style="margin-top:1.4rem;">Grasp success rate across constrained scenes (walls, shelves, boxes). Coverage-preserving selection further beats random sampling at <em>every</em> real-execution budget.</p>
       </div>
@@ -165,11 +165,11 @@
       <h2 class="sec-title">The AutoDex-51 Dataset</h2>
       <p class="sec-sub">Real-world-validated dexterous-grasp trajectories &mdash; successes and failures &mdash; captured by a 20-view synchronized RGB rig across four scene types.</p>
 
-      <div class="stat-strip reveal" style="margin-bottom:2.6rem;">
-        <div class="stat"><div class="num"><span data-target="1678" data-dec="0">0</span></div><div class="lbl">validated trajectories</div></div>
-        <div class="stat"><div class="num"><span data-target="51" data-dec="0">0</span></div><div class="lbl">objects (of 100 items)</div></div>
-        <div class="stat"><div class="num"><span data-target="4" data-dec="0">0</span></div><div class="lbl">scene types</div></div>
-        <div class="stat"><div class="num"><span data-target="2" data-dec="0">0</span></div><div class="lbl">hands (Allegro, Inspire)</div></div>
+      <div class="stat-strip" style="margin-bottom:2.6rem;">
+        <div class="stat"><div class="num">1,678</div><div class="lbl">validated trajectories</div></div>
+        <div class="stat"><div class="num">51</div><div class="lbl">objects (of 100 items)</div></div>
+        <div class="stat"><div class="num">4</div><div class="lbl">scene types</div></div>
+        <div class="stat"><div class="num">2</div><div class="lbl">hands (Allegro, Inspire)</div></div>
       </div>
 
       <h3 class="sec-title" style="font-size:1.4rem; margin-bottom:1.6rem;">Explore validated grasps</h3>
@@ -179,12 +179,12 @@
           <div class="gallery-name" id="gallery-name">Donut</div>
         </div>
         <div class="thumbs">
-          <div class="thumb active" data-name="Donut" data-src="static/videos/result_donut.mp4" data-poster="static/posters/result_donut.jpg"><img src="static/posters/result_donut.jpg" alt="donut"><div class="play"><i class="fas fa-play"></i></div><div class="cap">donut</div></div>
-          <div class="thumb" data-name="Blue vase" data-src="static/videos/result_bluevase.mp4" data-poster="static/posters/result_bluevase.jpg"><img src="static/posters/result_bluevase.jpg" alt="blue vase"><div class="play"><i class="fas fa-play"></i></div><div class="cap">blue vase</div></div>
-          <div class="thumb" data-name="Brush" data-src="static/videos/result_beige_brush.mp4" data-poster="static/posters/result_beige_brush.jpg"><img src="static/posters/result_beige_brush.jpg" alt="brush"><div class="play"><i class="fas fa-play"></i></div><div class="cap">brush</div></div>
-          <div class="thumb" data-name="Small bowl" data-src="static/videos/result_smallbowl.mp4" data-poster="static/posters/result_smallbowl.jpg"><img src="static/posters/result_smallbowl.jpg" alt="small bowl"><div class="play"><i class="fas fa-play"></i></div><div class="cap">small bowl</div></div>
-          <div class="thumb" data-name="Serving bowl" data-src="static/videos/result_servingbowl_small.mp4" data-poster="static/posters/result_servingbowl_small.jpg"><img src="static/posters/result_servingbowl_small.jpg" alt="serving bowl"><div class="play"><i class="fas fa-play"></i></div><div class="cap">serving bowl</div></div>
-          <div class="thumb" data-name="Soap tray" data-src="static/videos/result_soap_tray.mp4" data-poster="static/posters/result_soap_tray.jpg"><img src="static/posters/result_soap_tray.jpg" alt="soap tray"><div class="play"><i class="fas fa-play"></i></div><div class="cap">soap tray</div></div>
+          <div class="thumb active" data-name="Donut" data-src="static/videos/result_donut.mp4" data-poster="static/posters/result_donut.jpg"><img src="static/posters/result_donut.jpg" alt="donut"><div class="cap">donut</div></div>
+          <div class="thumb" data-name="Blue vase" data-src="static/videos/result_bluevase.mp4" data-poster="static/posters/result_bluevase.jpg"><img src="static/posters/result_bluevase.jpg" alt="blue vase"><div class="cap">blue vase</div></div>
+          <div class="thumb" data-name="Brush" data-src="static/videos/result_beige_brush.mp4" data-poster="static/posters/result_beige_brush.jpg"><img src="static/posters/result_beige_brush.jpg" alt="brush"><div class="cap">brush</div></div>
+          <div class="thumb" data-name="Small bowl" data-src="static/videos/result_smallbowl.mp4" data-poster="static/posters/result_smallbowl.jpg"><img src="static/posters/result_smallbowl.jpg" alt="small bowl"><div class="cap">small bowl</div></div>
+          <div class="thumb" data-name="Serving bowl" data-src="static/videos/result_servingbowl_small.mp4" data-poster="static/posters/result_servingbowl_small.jpg"><img src="static/posters/result_servingbowl_small.jpg" alt="serving bowl"><div class="cap">serving bowl</div></div>
+          <div class="thumb" data-name="Soap tray" data-src="static/videos/result_soap_tray.mp4" data-poster="static/posters/result_soap_tray.jpg"><img src="static/posters/result_soap_tray.jpg" alt="soap tray"><div class="cap">soap tray</div></div>
         </div>
       </div>
     </div>
