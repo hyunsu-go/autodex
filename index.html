@@ -60,10 +60,17 @@
 
     <div class="wrap-wide" style="margin-top:2.6rem;">
       <div class="frame reveal">
-        <video class="lazyplay" autoplay muted loop playsinline poster="static/images/teaser.png">
+        <video id="teaser-video" class="lazyplay" autoplay muted loop playsinline poster="static/images/teaser.png">
           <source src="static/videos/teaser.mp4" type="video/mp4">
         </video>
       </div>
+
+      <!-- Chapter timeline (click a chapter to jump). Timings live in CHAPTERS in static/js/index.js -->
+      <div class="vtimeline" id="vtimeline" aria-label="Video chapters">
+        <div class="vt-segs" id="vt-segs"></div>
+        <div class="vt-labels" id="vt-labels"></div>
+      </div>
+
       <p class="caption reveal"><b>AutoDex runs unattended.</b> Candidate grasps are generated in simulation, validated on a real multi-fingered hand under a 20-camera capture rig, and the workspace is reset autonomously between trials.</p>
     </div>
   </header>

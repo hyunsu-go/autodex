@@ -141,5 +141,30 @@ pre.bibtex { background:#f6f7f9; color:#1a1a1a; border:1px solid var(--rule); bo
 /* ---------- Footer ---------- */
 footer { padding: 2.5rem 0; text-align:center; color:var(--muted); font-size:.93rem; border-top:1px solid var(--rule); }
 
+/* ---------- Video chapter timeline ---------- */
+.vtimeline { margin-top: 1rem; }
+.vt-segs { display:flex; align-items:center; gap:4px; }
+.vt-seg {
+  position:relative; height:7px; background:#e7e8ee; border-radius:999px;
+  overflow:hidden; cursor:pointer; transition: background .15s;
+}
+.vt-seg:hover { background:#dcdef0; }
+.vt-seg.active { background:#d6daf3; }
+.vt-seg .fill { position:absolute; top:0; bottom:0; left:0; width:0; background:var(--accent); border-radius:999px; transition: width .1s linear; }
+.vt-labels { display:flex; gap:4px; margin-top:.6rem; }
+.vt-lab {
+  flex-grow:1; flex-basis:0; min-width:0; background:none; border:none; cursor:pointer;
+  text-align:left; color:var(--muted); font-size:.86rem; font-weight:500; font-family:inherit;
+  display:flex; align-items:center; gap:.45rem; padding:0; line-height:1.25; transition: color .15s;
+}
+.vt-lab:hover { color: var(--ink); }
+.vt-lab .n {
+  flex:none; width:19px; height:19px; border-radius:50%; background:#e7e8ee; color:var(--muted);
+  display:grid; place-items:center; font-size:.72rem; font-weight:700; transition: all .15s;
+}
+.vt-lab.active { color: var(--ink); }
+.vt-lab.active .n { background: var(--accent); color:#fff; }
+@media (max-width:640px){ .vt-lab{ font-size:.72rem; gap:.3rem; } .vt-lab .n{ display:none; } }
+
 /* reveal disabled — content shown statically */
 .reveal { opacity:1; transform:none; }
