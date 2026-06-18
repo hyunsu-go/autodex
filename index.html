@@ -73,10 +73,10 @@
   <section style="padding:2.5rem 0;">
     <div class="wrap-wide">
       <div class="stat-strip">
-        <div class="stat"><div class="num">71.0%</div><div class="lbl">success on constrained scenes</div></div>
-        <div class="stat"><div class="num">1,678</div><div class="lbl">validated trajectories</div></div>
-        <div class="stat"><div class="num">51</div><div class="lbl">objects collected</div></div>
-        <div class="stat"><div class="num">20</div><div class="lbl">synchronized cameras</div></div>
+        <div class="stat"><div class="num">3,593</div><div class="lbl">validated grasps</div></div>
+        <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
+        <div class="stat"><div class="num">76%</div><div class="lbl">grasp success (vs 34% sim-only)</div></div>
+        <div class="stat"><div class="num">4.8&times;</div><div class="lbl">faster than teleoperation</div></div>
       </div>
     </div>
   </section>
@@ -88,7 +88,8 @@
       <h2 class="sec-title">Abstract</h2>
       <div class="prose reveal">
         <p>Dexterous grasping requires real-world data, yet existing collection paradigms force a choice between simulation (cheap but contact-unreliable) and human teleoperation (faithful but unscalable). We argue that the underlying obstacle is a structural property of the problem: sim-to-real transfer for grasping is <em>asymmetric</em> &mdash; geometric feasibility (IK solvability, collision avoidance, kinematic reachability) transfers reliably from simulation, while contact dynamics (friction, slip, multi-finger force closure) do not.</p>
-        <p>We present <b>AutoDex</b>, a system that operationalizes this asymmetry. Candidate grasps are generated cheaply in simulation and pre-filtered under deliberately optimistic settings; surviving candidates are validated on a real multi-fingered hand by an automated execution pipeline (grasp generation, virtual-obstacle scene synthesis, motion planning, dense 20-camera tracking, autonomous reset). A coverage-preserving selection algorithm allocates the limited real-execution budget to maximize scenario solvability across constrained scenes (walls, shelves, boxes). The system is generator-agnostic and runs unattended, producing <b>AutoDex-51</b>, a real-world-validated dataset of 1,678 dexterous-grasp trajectories with both successes and failures.</p>
+        <p>We present <b>AutoDex</b>, an automated real-world data-collection system that uses simulation to propose geometrically feasible grasps and physical execution with a multi-fingered hand to validate grasp stability. AutoDex closes the full loop without human intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, actively resets the object for the next trial, and logs each trajectory.</p>
+        <p>Using AutoDex, we collect <b>3,593</b> real-world-validated grasps across the Allegro and Inspire hands on <b>100</b> diverse objects, including both successful and failed trials. For a matched 500-trajectory collection, AutoDex requires 10.3&nbsp;h versus 49.4&nbsp;h for teleoperation &mdash; a <b>4.8&times;</b> throughput improvement &mdash; and real-world validation raises grasp success from <b>34%</b> under simulation-only validation to <b>76%</b>.</p>
       </div>
     </div>
   </section>
@@ -101,14 +102,14 @@
       <p class="sec-sub">Many dominant dexterous failure modes &mdash; finger-pad deformation, micro-slip, force closure across simultaneous contacts &mdash; are not parameters any simulator exposes. Validating candidates on real hardware fixes that.</p>
       <div class="cmp reveal">
         <div class="cmp-row">
-          <div class="cmp-head"><span>Real-filtered grasps <span class="tag">(AutoDex)</span></span><span class="pct" style="color:var(--accent)">71.0%</span></div>
-          <div class="cmp-track"><div class="cmp-fill win" style="width:71%"></div></div>
+          <div class="cmp-head"><span>AutoDex-validated database <span class="tag">(real execution)</span></span><span class="pct" style="color:var(--accent)">76%</span></div>
+          <div class="cmp-track"><div class="cmp-fill win" style="width:76%"></div></div>
         </div>
         <div class="cmp-row">
-          <div class="cmp-head"><span>Sim-validated grasps</span><span class="pct" style="color:var(--muted)">33.0%</span></div>
-          <div class="cmp-track"><div class="cmp-fill lose" style="width:33%"></div></div>
+          <div class="cmp-head"><span>Raw generator database <span class="tag">(sim-only)</span></span><span class="pct" style="color:var(--muted)">34%</span></div>
+          <div class="cmp-track"><div class="cmp-fill lose" style="width:34%"></div></div>
         </div>
-        <p class="caption" style="margin-top:1.4rem;">Grasp success rate across constrained scenes (walls, shelves, boxes). Coverage-preserving selection further beats random sampling at <em>every</em> real-execution budget.</p>
+        <p class="caption" style="margin-top:1.4rem;">Retrieval-execution success across four scene types. The gain holds across material, scene, and weight categories &mdash; and is largest in cluttered scenes, where validated grasps still reach 80&ndash;90% success.</p>
       </div>
     </div>
   </section>
@@ -144,7 +145,7 @@
         </div>
         <div class="step-panel" data-step="2">
           <div class="frame"><video muted loop playsinline poster="static/posters/coverage.jpg"><source src="static/videos/coverage.mp4" type="video/mp4"></video></div>
-          <div><h3>Coverage-preserving selection</h3><p>A max-coverage algorithm allocates the limited real-execution budget to maximize scenario solvability across constrained scenes &mdash; beating random sampling at every budget.</p></div>
+          <div><h3>Coverage-aware selection</h3><p>Selection allocates the limited real-execution budget across the four scene types, prioritizing candidates that cover the most scene constraints before committing robot time.</p></div>
         </div>
         <div class="step-panel" data-step="3">
           <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
@@ -162,12 +163,12 @@
   <section class="soft" id="dataset">
     <div class="wrap-wide">
       <div class="sec-eyebrow">Dataset</div>
-      <h2 class="sec-title">The AutoDex-51 Dataset</h2>
-      <p class="sec-sub">Real-world-validated dexterous-grasp trajectories &mdash; successes and failures &mdash; captured by a 20-view synchronized RGB rig across four scene types.</p>
+      <h2 class="sec-title">The AutoDex Dataset</h2>
+      <p class="sec-sub">Real-world-validated dexterous grasps &mdash; successes and failures &mdash; with synchronized multi-view observations and robot-state logs, captured by a 20-view RGB rig across four scene types.</p>
 
       <div class="stat-strip" style="margin-bottom:2.6rem;">
-        <div class="stat"><div class="num">1,678</div><div class="lbl">validated trajectories</div></div>
-        <div class="stat"><div class="num">51</div><div class="lbl">objects (of 100 items)</div></div>
+        <div class="stat"><div class="num">3,593</div><div class="lbl">validated grasps</div></div>
+        <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
         <div class="stat"><div class="num">4</div><div class="lbl">scene types</div></div>
         <div class="stat"><div class="num">2</div><div class="lbl">hands (Allegro, Inspire)</div></div>
       </div>
@@ -195,13 +196,13 @@
     <div class="wrap-wide">
       <div class="sec-eyebrow">Experiments</div>
       <h2 class="sec-title">Results</h2>
-      <p class="sec-sub">Real-world validation, coverage selection, and multi-camera perception, evaluated on the physical robot.</p>
+      <p class="sec-sub">Real-world validation, multi-view perception, and autonomous reset, evaluated on the physical robot.</p>
 
       <div class="fig-grid">
-        <div class="reveal"><div class="frame"><img src="static/images/physical_validation.png" alt="Physical validation"></div><p class="caption"><b>Physical validation.</b> Real-filtered grasps outperform sim-validated grasps across constrained scenes.</p></div>
-        <div class="reveal"><div class="frame"><img src="static/images/cost_combined.png" alt="Coverage vs random"></div><p class="caption"><b>Coverage-preserving selection</b> beats random sampling at every real-execution budget.</p></div>
-        <div class="reveal"><div class="frame"><img src="static/images/simdr_figure.png" alt="Sim vs DR"></div><p class="caption"><b>Precision&ndash;recall of sim-only validation</b>, with and without domain randomization.</p></div>
-        <div class="reveal"><div class="frame"><img src="static/images/trajectory_visualization2.png" alt="Trajectory visualization"></div><p class="caption"><b>Captured trajectories</b> from the 20-camera rig.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/physical_validation.png" alt="Raw generator vs AutoDex-validated"></div><p class="caption"><b>Physical validation.</b> The AutoDex-validated database reaches 76% execution success vs. 34% for the raw generator set, broken down by material, scene, and weight.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/cameras_vs_success.png" alt="Pose accuracy vs number of cameras"></div><p class="caption"><b>Multi-view perception.</b> Pose accuracy improves with camera count; sparse-view configurations incur catastrophic pose failures on thin and textureless objects.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/reset_success_scatter.png" alt="Reset success vs transition difficulty"></div><p class="caption"><b>Autonomous reset.</b> Stable reorient placement sustains high reset success even for near-unreachable pose transitions, where passive strategies collapse.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/trajectory_visualization2.png" alt="Constraint adaptation in execution"></div><p class="caption"><b>Constraint adaptation.</b> The hand reorients its approach to satisfy each geometric constraint &mdash; reaching past a wall, descending into a shelf, threading clutter.</p></div>
       </div>
     </div>
   </section>
