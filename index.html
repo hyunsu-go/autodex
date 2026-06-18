@@ -4,256 +4,232 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AutoDex: An Automated Real-World System for Dexterous Grasping Data Collection</title>
-  <meta name="description" content="AutoDex is the first autonomous real-world data-collection system for multi-finger dexterous grasping: it generates candidate grasps in simulation, selects them under a coverage-preserving budget, and validates them on a physical robot fully unattended.">
-
-  <!-- Open Graph -->
+  <meta name="description" content="AutoDex is an autonomous real-world data-collection system for multi-finger dexterous grasping: it generates candidate grasps in simulation, selects them under a coverage-preserving budget, and validates them on a physical robot fully unattended.">
   <meta property="og:title" content="AutoDex: Automated Real-World Dexterous Grasping Data Collection">
   <meta property="og:description" content="An autonomous real-world system that generates, selects, and validates dexterous grasps without a human in the loop.">
   <meta property="og:image" content="static/images/teaser.png">
   <meta property="og:type" content="website">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="static/css/index.css">
 </head>
-
 <body>
 
-  <!-- ============ HERO ============ -->
-  <section class="hero-head">
-    <div class="container is-max-desktop">
-      <h1 class="title publication-title is-size-2-desktop is-size-3-mobile">
-        <span class="autodex">AutoDex</span>: An Automated Real-World System<br>
-        for Dexterous Grasping Data Collection
-      </h1>
-      <p class="subtitle-tagline">
-        Collecting real-world-validated dexterous grasps &mdash; successes and failures &mdash; with no human in the per-trial loop.
-      </p>
-
-      <div class="is-size-5 authors" style="margin-top:1.5rem;">
-        <span class="author-block"><a href="mailto:willi19@snu.ac.kr">Mingi Choi</a><sup>1</sup>,</span>
-        <span class="author-block">Gunhee Kim<sup>1</sup>,</span>
-        <span class="author-block">Jisoo Kim<sup>1</sup>,</span>
-        <span class="author-block">Taeksoo Kim<sup>1</sup>,</span>
-        <span class="author-block">Taeyun Ha<sup>1</sup>,</span>
-        <span class="author-block">Jongbin Lim<sup>1</sup>,</span>
-        <span class="author-block">Hanbyul Joo<sup>1,2</sup></span>
-      </div>
-      <div class="is-affiliation" style="margin-top:.6rem;">
-        <sup>1</sup>Seoul National University &nbsp;&nbsp; <sup>2</sup>RLWRLD
-      </div>
-      <div class="link-buttons buttons is-centered">
-        <a class="button" href="#" target="_blank" rel="noopener">
-          <span class="icon"><i class="fas fa-file-pdf"></i></span><span>Paper</span>
-        </a>
-        <a class="button" href="#" target="_blank" rel="noopener">
-          <span class="icon"><i class="fas fa-file-lines"></i></span><span>arXiv</span>
-        </a>
-        <a class="button" href="#" target="_blank" rel="noopener">
-          <span class="icon"><i class="fab fa-github"></i></span><span>Code</span>
-        </a>
-        <a class="button" href="#dataset">
-          <span class="icon"><i class="fas fa-database"></i></span><span>Dataset</span>
-        </a>
-        <a class="button" href="#video">
-          <span class="icon"><i class="fas fa-play"></i></span><span>Video</span>
-        </a>
+  <!-- ================= NAVBAR ================= -->
+  <nav class="nav">
+    <div class="wrap-wide nav-inner">
+      <a href="#top" class="nav-logo">Auto<span class="dot">Dex</span></a>
+      <div class="nav-links">
+        <a class="navlink" href="#abstract" data-sec="abstract">Abstract</a>
+        <a class="navlink" href="#pipeline" data-sec="pipeline">Pipeline</a>
+        <a class="navlink" href="#dataset" data-sec="dataset">Dataset</a>
+        <a class="navlink" href="#results" data-sec="results">Results</a>
+        <a class="navlink" href="#bibtex" data-sec="bibtex">BibTeX</a>
+        <a class="nav-cta" href="#" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
       </div>
     </div>
-  </section>
+  </nav>
 
-  <!-- ============ TEASER VIDEO ============ -->
-  <section class="section" id="video" style="padding-top:1.5rem;">
-    <div class="container is-max-desktop">
-      <div class="framed">
-        <video autoplay muted loop playsinline poster="static/images/teaser.png">
+  <!-- ================= HERO ================= -->
+  <header class="hero" id="top">
+    <div class="wrap">
+      <span class="eyebrow">Autonomous Real-World Data Collection</span>
+      <h1 class="title"><span class="grad">AutoDex</span>: Automated Dexterous Grasping Data Collection</h1>
+      <p class="tagline">Collecting real-world-validated dexterous grasps &mdash; successes <em>and</em> failures &mdash; on a physical robot, with no human in the per-trial loop.</p>
+
+      <div class="authors">
+        <span class="a"><a href="mailto:willi19@snu.ac.kr">Mingi Choi</a><sup>1</sup>,</span>
+        <span class="a">Gunhee Kim<sup>1</sup>,</span>
+        <span class="a">Jisoo Kim<sup>1</sup>,</span>
+        <span class="a">Taeksoo Kim<sup>1</sup>,</span>
+        <span class="a">Taeyun Ha<sup>1</sup>,</span>
+        <span class="a">Jongbin Lim<sup>1</sup>,</span>
+        <span class="a">Hanbyul Joo<sup>1,2</sup></span>
+        <div class="affil"><sup>1</sup>Seoul National University &nbsp;&middot;&nbsp; <sup>2</sup>RLWRLD</div>
+      </div>
+
+      <div class="btns">
+        <a class="btn" href="#" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
+        <a class="btn ghost" href="#" target="_blank" rel="noopener"><i class="fas fa-file-lines"></i> arXiv</a>
+        <a class="btn ghost" href="https://github.com/willi19/autodex-code" target="_blank" rel="noopener"><i class="fab fa-github"></i> Code</a>
+        <a class="btn ghost" href="#dataset"><i class="fas fa-database"></i> Dataset</a>
+      </div>
+    </div>
+
+    <div class="wrap-wide" style="margin-top:2.6rem;">
+      <div class="frame reveal">
+        <video class="lazyplay" autoplay muted loop playsinline poster="static/images/teaser.png">
           <source src="static/videos/teaser.mp4" type="video/mp4">
         </video>
       </div>
-      <p class="caption">
-        <b>AutoDex runs unattended.</b> Candidate grasps are generated in simulation, validated on a real
-        multi-fingered hand under a 20-camera capture rig, and the workspace is reset autonomously between trials.
-      </p>
+      <p class="caption reveal"><b>AutoDex runs unattended.</b> Candidate grasps are generated in simulation, validated on a real multi-fingered hand under a 20-camera capture rig, and the workspace is reset autonomously between trials.</p>
     </div>
-  </section>
+  </header>
 
-  <!-- ============ ABSTRACT ============ -->
-  <section class="section bg-soft">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">Abstract</h2>
-      <div class="content-text">
-        <p>
-          Dexterous grasping requires real-world data, yet existing collection paradigms force a choice between
-          simulation (cheap but contact-unreliable) and human teleoperation (faithful but unscalable). We argue that
-          the underlying obstacle is a structural property of the problem: sim-to-real transfer for grasping is
-          <i>asymmetric</i> &mdash; geometric feasibility (IK solvability, collision avoidance, kinematic reachability)
-          transfers reliably from simulation, while contact dynamics (friction, slip, multi-finger force closure) do not.
-        </p>
-        <p>
-          We present <b>AutoDex</b>, a system that operationalizes this asymmetry. Candidate grasps are generated
-          cheaply in simulation and pre-filtered under deliberately optimistic settings; surviving candidates are
-          validated on a real multi-fingered hand by an automated execution pipeline (BODex generation, virtual-obstacle
-          scene synthesis, CuRobo motion planning, dense 20-camera tracking, autonomous reset). A coverage-preserving
-          selection algorithm allocates the limited real-execution budget to maximize scenario solvability across
-          constrained scenes (walls, shelves, boxes). The system is generator-agnostic and runs unattended, producing
-          <b>AutoDex-51</b>, a real-world-validated dataset of 1,678 dexterous-grasp trajectories with both successes
-          and failures. Real-filtered grasps achieve <b>71.0%</b> success across constrained scenes versus <b>33.0%</b>
-          for sim-validated grasps, and coverage-preserving selection beats random sampling at every grasp budget.
-        </p>
+  <!-- ================= STAT STRIP ================= -->
+  <section style="padding:2.5rem 0;">
+    <div class="wrap-wide">
+      <div class="stat-strip">
+        <div class="stat reveal"><div class="num"><span data-target="71" data-dec="1" data-suffix="%">0</span></div><div class="lbl">success on constrained scenes</div></div>
+        <div class="stat reveal"><div class="num"><span data-target="1678" data-dec="0">0</span></div><div class="lbl">validated trajectories</div></div>
+        <div class="stat reveal"><div class="num"><span data-target="51" data-dec="0">0</span></div><div class="lbl">objects collected</div></div>
+        <div class="stat reveal"><div class="num"><span data-target="20" data-dec="0">0</span></div><div class="lbl">synchronized cameras</div></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ HEADLINE RESULT ============ -->
-  <section class="section">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">Why real-world validation matters</h2>
-      <p class="section-sub">
-        Many dominant dexterous failure modes &mdash; finger-pad deformation, micro-slip, force closure across
-        simultaneous contacts &mdash; are not parameters any simulator exposes. Validating on real hardware more than
-        doubles downstream success across constrained scenes.
-      </p>
-      <div class="headline">
-        <div class="result-pill win">
-          <div class="big">71.0%</div>
-          <div class="small">Real-filtered grasps<br>(AutoDex)</div>
-        </div>
-        <div class="vs">vs</div>
-        <div class="result-pill">
-          <div class="big">33.0%</div>
-          <div class="small">Sim-validated grasps</div>
-        </div>
-      </div>
-      <p class="caption">Success rate across constrained scenes (walls, shelves, boxes).</p>
-    </div>
-  </section>
-
-  <!-- ============ SYSTEM OVERVIEW ============ -->
-  <section class="section bg-soft">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">System Overview</h2>
-      <p class="section-sub">
-        Given a candidate generator and a multi-fingered hand, AutoDex automatically executes each candidate,
-        observes its outcome, and resets the workspace &mdash; producing ground-truth physical labels with no
-        teleoperator and no per-trial supervision.
-      </p>
-      <div class="framed">
-        <img src="static/images/system.png" alt="AutoDex system overview">
+  <!-- ================= ABSTRACT ================= -->
+  <section class="soft" id="abstract">
+    <div class="wrap">
+      <div class="sec-eyebrow">Overview</div>
+      <h2 class="sec-title">Abstract</h2>
+      <div class="prose reveal">
+        <p>Dexterous grasping requires real-world data, yet existing collection paradigms force a choice between simulation (cheap but contact-unreliable) and human teleoperation (faithful but unscalable). We argue that the underlying obstacle is a structural property of the problem: sim-to-real transfer for grasping is <em>asymmetric</em> &mdash; geometric feasibility (IK solvability, collision avoidance, kinematic reachability) transfers reliably from simulation, while contact dynamics (friction, slip, multi-finger force closure) do not.</p>
+        <p>We present <b>AutoDex</b>, a system that operationalizes this asymmetry. Candidate grasps are generated cheaply in simulation and pre-filtered under deliberately optimistic settings; surviving candidates are validated on a real multi-fingered hand by an automated execution pipeline (grasp generation, virtual-obstacle scene synthesis, motion planning, dense 20-camera tracking, autonomous reset). A coverage-preserving selection algorithm allocates the limited real-execution budget to maximize scenario solvability across constrained scenes (walls, shelves, boxes). The system is generator-agnostic and runs unattended, producing <b>AutoDex-51</b>, a real-world-validated dataset of 1,678 dexterous-grasp trajectories with both successes and failures.</p>
       </div>
     </div>
   </section>
 
-  <!-- ============ PIPELINE STEPS ============ -->
-  <section class="section">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">The Pipeline</h2>
-      <p class="section-sub">An end-to-end autonomous loop, running at about 150&nbsp;s per sample.</p>
-      <div class="steps">
-        <div class="step">
-          <video autoplay muted loop playsinline><source src="static/videos/grasp_check.mp4" type="video/mp4"></video>
-          <h4><span class="num">1</span>Generation &amp; pre-filter</h4>
-          <p>Candidate grasps are generated in simulation (BODex) inside virtual-obstacle scenes and pre-filtered under deliberately optimistic settings to keep geometrically feasible candidates.</p>
+  <!-- ================= WHY REAL VALIDATION ================= -->
+  <section>
+    <div class="wrap">
+      <div class="sec-eyebrow">Key Result</div>
+      <h2 class="sec-title">Real-world validation more than doubles success</h2>
+      <p class="sec-sub">Many dominant dexterous failure modes &mdash; finger-pad deformation, micro-slip, force closure across simultaneous contacts &mdash; are not parameters any simulator exposes. Validating candidates on real hardware fixes that.</p>
+      <div class="cmp reveal">
+        <div class="cmp-row">
+          <div class="cmp-head"><span>Real-filtered grasps <span class="tag">(AutoDex)</span></span><span class="pct" style="color:var(--accent)">71.0%</span></div>
+          <div class="cmp-track"><div class="cmp-fill win" data-w="71"></div></div>
         </div>
-        <div class="step">
-          <video autoplay muted loop playsinline><source src="static/videos/coverage.mp4" type="video/mp4"></video>
-          <h4><span class="num">2</span>Coverage-preserving selection</h4>
-          <p>A max-coverage selection algorithm allocates the limited real-execution budget to maximize scenario solvability across constrained scenes.</p>
+        <div class="cmp-row">
+          <div class="cmp-head"><span>Sim-validated grasps</span><span class="pct" style="color:var(--muted)">33.0%</span></div>
+          <div class="cmp-track"><div class="cmp-fill lose" data-w="33"></div></div>
         </div>
-        <div class="step">
-          <video autoplay muted loop playsinline><source src="static/videos/perception.mp4" type="video/mp4"></video>
-          <h4><span class="num">3</span>Real-world execution</h4>
-          <p>CuRobo plans collision-free motion; a dense 20-camera synchronized RGB rig tracks the object and hand throughout each lift-and-hold trial.</p>
+        <p class="caption" style="margin-top:1.4rem;">Grasp success rate across constrained scenes (walls, shelves, boxes). Coverage-preserving selection further beats random sampling at <em>every</em> real-execution budget.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SYSTEM OVERVIEW ================= -->
+  <section class="soft">
+    <div class="wrap-wide">
+      <div class="sec-eyebrow">System</div>
+      <h2 class="sec-title">How AutoDex works</h2>
+      <p class="sec-sub">Given a candidate generator and a multi-fingered hand, AutoDex executes each candidate, observes its physical outcome, and resets the workspace &mdash; producing ground-truth labels with no teleoperator.</p>
+      <div class="frame reveal" style="background:#fff;"><img src="static/images/system.png" alt="AutoDex system overview"></div>
+    </div>
+  </section>
+
+  <!-- ================= PIPELINE STEPPER ================= -->
+  <section id="pipeline">
+    <div class="wrap-wide">
+      <div class="sec-eyebrow">Pipeline</div>
+      <h2 class="sec-title">An autonomous loop, ~150&nbsp;s per sample</h2>
+      <p class="sec-sub">Click each stage to see it run.</p>
+
+      <div class="stepper reveal">
+        <div class="step-tab active" data-step="1"><span class="n">1</span> Generate &amp; pre-filter</div>
+        <div class="step-tab" data-step="2"><span class="n">2</span> Coverage selection</div>
+        <div class="step-tab" data-step="3"><span class="n">3</span> Real execution</div>
+        <div class="step-tab" data-step="4"><span class="n">4</span> Autonomous reset</div>
+      </div>
+
+      <div class="reveal">
+        <div class="step-panel active" data-step="1">
+          <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
+          <div><h3>Generate &amp; pre-filter</h3><p>Candidate grasps are generated in simulation inside virtual-obstacle scenes, then pre-filtered under deliberately optimistic settings &mdash; keeping every geometrically feasible candidate while discarding the impossible ones cheaply.</p></div>
         </div>
-        <div class="step">
-          <video autoplay muted loop playsinline><source src="static/videos/reset.mp4" type="video/mp4"></video>
-          <h4><span class="num">4</span>Autonomous reset</h4>
-          <p>A hardware-aware sequential reset restores the workspace between trials, letting the system run unattended and collect both successes and failures.</p>
+        <div class="step-panel" data-step="2">
+          <div class="frame"><video muted loop playsinline poster="static/posters/coverage.jpg"><source src="static/videos/coverage.mp4" type="video/mp4"></video></div>
+          <div><h3>Coverage-preserving selection</h3><p>A max-coverage algorithm allocates the limited real-execution budget to maximize scenario solvability across constrained scenes &mdash; beating random sampling at every budget.</p></div>
+        </div>
+        <div class="step-panel" data-step="3">
+          <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
+          <div><h3>Real-world execution</h3><p>Motion planning produces a collision-free trajectory; a dense 20-camera synchronized RGB rig tracks object and hand throughout each lift-and-hold trial, yielding a ground-truth success/failure label.</p></div>
+        </div>
+        <div class="step-panel" data-step="4">
+          <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
+          <div><h3>Autonomous reset</h3><p>A hardware-aware sequential reset restores the workspace between trials &mdash; letting the system run fully unattended overnight and collect both successes and failures at scale.</p></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ DATASET ============ -->
-  <section class="section bg-soft" id="dataset">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">The AutoDex-51 Dataset</h2>
-      <p class="section-sub">
-        Real-world-validated dexterous-grasp trajectories &mdash; successes and failures &mdash; captured by a
-        20-view synchronized RGB rig across four scene types (tabletop, wall, shelf, box).
-      </p>
-      <div class="stats">
-        <div class="stat-card"><div class="stat-num">1,678</div><div class="stat-label">validated trajectories</div></div>
-        <div class="stat-card"><div class="stat-num">51</div><div class="stat-label">objects (of 100 household items)</div></div>
-        <div class="stat-card"><div class="stat-num">20</div><div class="stat-label">synchronized cameras</div></div>
-        <div class="stat-card"><div class="stat-num">4</div><div class="stat-label">scene types</div></div>
-        <div class="stat-card"><div class="stat-num">2</div><div class="stat-label">embodiments (Allegro, Inspire)</div></div>
+  <!-- ================= DATASET ================= -->
+  <section class="soft" id="dataset">
+    <div class="wrap-wide">
+      <div class="sec-eyebrow">Dataset</div>
+      <h2 class="sec-title">The AutoDex-51 Dataset</h2>
+      <p class="sec-sub">Real-world-validated dexterous-grasp trajectories &mdash; successes and failures &mdash; captured by a 20-view synchronized RGB rig across four scene types.</p>
+
+      <div class="stat-strip reveal" style="margin-bottom:2.6rem;">
+        <div class="stat"><div class="num"><span data-target="1678" data-dec="0">0</span></div><div class="lbl">validated trajectories</div></div>
+        <div class="stat"><div class="num"><span data-target="51" data-dec="0">0</span></div><div class="lbl">objects (of 100 items)</div></div>
+        <div class="stat"><div class="num"><span data-target="4" data-dec="0">0</span></div><div class="lbl">scene types</div></div>
+        <div class="stat"><div class="num"><span data-target="2" data-dec="0">0</span></div><div class="lbl">hands (Allegro, Inspire)</div></div>
       </div>
 
-      <h3 class="section-title" style="font-size:1.35rem; margin-top:2.5rem;">Example validated grasps</h3>
-      <div class="video-grid">
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_donut.mp4" type="video/mp4"></video><div class="vg-label">donut</div></div>
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_bluevase.mp4" type="video/mp4"></video><div class="vg-label">blue vase</div></div>
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_beige_brush.mp4" type="video/mp4"></video><div class="vg-label">brush</div></div>
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_smallbowl.mp4" type="video/mp4"></video><div class="vg-label">small bowl</div></div>
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_servingbowl_small.mp4" type="video/mp4"></video><div class="vg-label">serving bowl</div></div>
-        <div><video autoplay muted loop playsinline><source src="static/videos/result_soap_tray.mp4" type="video/mp4"></video><div class="vg-label">soap tray</div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ RESULTS ============ -->
-  <section class="section" id="results">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">Results</h2>
-
-      <div class="columns is-variable is-6" style="margin-top:1rem;">
-        <div class="column">
-          <div class="framed"><img src="static/images/physical_validation.png" alt="Physical validation results"></div>
-          <p class="caption"><b>Physical validation.</b> Real-filtered grasps outperform sim-validated grasps across constrained scenes.</p>
+      <h3 class="sec-title" style="font-size:1.4rem; margin-bottom:1.6rem;">Explore validated grasps</h3>
+      <div class="gallery reveal">
+        <div class="gallery-main">
+          <div class="frame"><video id="gallery-video" class="lazyplay" autoplay muted loop playsinline poster="static/posters/result_donut.jpg"><source src="static/videos/result_donut.mp4" type="video/mp4"></video></div>
+          <div class="gallery-name" id="gallery-name">Donut</div>
         </div>
-        <div class="column">
-          <div class="framed"><img src="static/images/cost_combined.png" alt="Coverage selection vs random sampling"></div>
-          <p class="caption"><b>Coverage-preserving selection</b> beats random sampling at every real-execution budget.</p>
-        </div>
-      </div>
-
-      <div class="columns is-variable is-6">
-        <div class="column">
-          <div class="framed"><img src="static/images/simdr_figure.png" alt="Simulation vs domain randomization"></div>
-          <p class="caption"><b>Precision&ndash;recall of sim-only validation</b>, with and without domain randomization.</p>
-        </div>
-        <div class="column">
-          <div class="framed"><img src="static/images/trajectory_visualization2.png" alt="Trajectory visualization"></div>
-          <p class="caption"><b>Captured trajectories</b> from the 20-camera rig.</p>
+        <div class="thumbs">
+          <div class="thumb active" data-name="Donut" data-src="static/videos/result_donut.mp4" data-poster="static/posters/result_donut.jpg"><img src="static/posters/result_donut.jpg" alt="donut"><div class="play"><i class="fas fa-play"></i></div><div class="cap">donut</div></div>
+          <div class="thumb" data-name="Blue vase" data-src="static/videos/result_bluevase.mp4" data-poster="static/posters/result_bluevase.jpg"><img src="static/posters/result_bluevase.jpg" alt="blue vase"><div class="play"><i class="fas fa-play"></i></div><div class="cap">blue vase</div></div>
+          <div class="thumb" data-name="Brush" data-src="static/videos/result_beige_brush.mp4" data-poster="static/posters/result_beige_brush.jpg"><img src="static/posters/result_beige_brush.jpg" alt="brush"><div class="play"><i class="fas fa-play"></i></div><div class="cap">brush</div></div>
+          <div class="thumb" data-name="Small bowl" data-src="static/videos/result_smallbowl.mp4" data-poster="static/posters/result_smallbowl.jpg"><img src="static/posters/result_smallbowl.jpg" alt="small bowl"><div class="play"><i class="fas fa-play"></i></div><div class="cap">small bowl</div></div>
+          <div class="thumb" data-name="Serving bowl" data-src="static/videos/result_servingbowl_small.mp4" data-poster="static/posters/result_servingbowl_small.jpg"><img src="static/posters/result_servingbowl_small.jpg" alt="serving bowl"><div class="play"><i class="fas fa-play"></i></div><div class="cap">serving bowl</div></div>
+          <div class="thumb" data-name="Soap tray" data-src="static/videos/result_soap_tray.mp4" data-poster="static/posters/result_soap_tray.jpg"><img src="static/posters/result_soap_tray.jpg" alt="soap tray"><div class="play"><i class="fas fa-play"></i></div><div class="cap">soap tray</div></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ BIBTEX ============ -->
-  <section class="section bg-soft" id="bibtex">
-    <div class="container is-max-desktop">
-      <h2 class="section-title">BibTeX</h2>
-      <pre class="bibtex">@misc{choi2026autodex,
+  <!-- ================= RESULTS ================= -->
+  <section id="results">
+    <div class="wrap-wide">
+      <div class="sec-eyebrow">Experiments</div>
+      <h2 class="sec-title">Results</h2>
+      <p class="sec-sub">Real-world validation, coverage selection, and multi-camera perception, evaluated on the physical robot.</p>
+
+      <div class="fig-grid">
+        <div class="reveal"><div class="frame"><img src="static/images/physical_validation.png" alt="Physical validation"></div><p class="caption"><b>Physical validation.</b> Real-filtered grasps outperform sim-validated grasps across constrained scenes.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/cost_combined.png" alt="Coverage vs random"></div><p class="caption"><b>Coverage-preserving selection</b> beats random sampling at every real-execution budget.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/simdr_figure.png" alt="Sim vs DR"></div><p class="caption"><b>Precision&ndash;recall of sim-only validation</b>, with and without domain randomization.</p></div>
+        <div class="reveal"><div class="frame"><img src="static/images/trajectory_visualization2.png" alt="Trajectory visualization"></div><p class="caption"><b>Captured trajectories</b> from the 20-camera rig.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BIBTEX ================= -->
+  <section class="soft" id="bibtex">
+    <div class="wrap">
+      <div class="sec-eyebrow">Cite</div>
+      <h2 class="sec-title">BibTeX</h2>
+      <div class="bib reveal">
+        <button class="copy-btn" id="copy-bib">Copy</button>
+        <pre class="bibtex" id="bibtex-text">@misc{choi2026autodex,
   title  = {AutoDex: An Automated Real-World System for Dexterous Grasping Data Collection},
   author = {Choi, Mingi and Kim, Gunhee and Kim, Jisoo and Kim, Taeksoo and
             Ha, Taeyun and Lim, Jongbin and Joo, Hanbyul},
   year   = {2026}
 }</pre>
+      </div>
     </div>
   </section>
 
   <footer>
-    <p>
-      Project page for <b>AutoDex</b>. &nbsp;|&nbsp;
-      <a href="mailto:willi19@snu.ac.kr">willi19@snu.ac.kr</a>
-    </p>
-    <p style="margin-top:.6rem;">
-      Website template adapted from the <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a> project page.
-    </p>
+    <div class="wrap">
+      <p>Project page for <b>AutoDex</b>. &nbsp;&middot;&nbsp; <a href="mailto:willi19@snu.ac.kr">willi19@snu.ac.kr</a></p>
+      <p style="margin-top:.5rem; font-size:.88rem;">Design inspired by modern academic project page templates.</p>
+    </div>
   </footer>
 
+  <script src="static/js/index.js"></script>
 </body>
 </html>
