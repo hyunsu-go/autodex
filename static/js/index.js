@@ -1,55 +1,58 @@
 /* ===================== AutoDex page interactions ===================== */
 document.addEventListener('DOMContentLoaded', function () {
 
-  /* ---- Teaser video chapter timeline ----
-     PLACEHOLDER timings (seconds) — replace `t` with the real chapter starts. */
-  const CHAPTERS = [
-    { t: 0,  label: 'Generate' },
-    { t: 5,  label: 'Select' },
-    { t: 9,  label: 'Execute' },
-    { t: 15, label: 'Reset' },
+  /* ---- Interactive showcase: pick object -> generate -> execute ---- */
+  const OBJECTS = [
+    { name: 'Donut',        gen: 'static/videos/gen_donut.mp4',             exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
+    { name: 'Blue vase',    gen: 'static/videos/gen_blue_vase.mp4',         exec: 'static/videos/result_bluevase.mp4',          poster: 'static/posters/result_bluevase.jpg' },
+    { name: 'Brush',        gen: 'static/videos/gen_beige_brush.mp4',       exec: 'static/videos/result_beige_brush.mp4',       poster: 'static/posters/result_beige_brush.jpg' },
+    { name: 'Small bowl',   gen: 'static/videos/gen_smallbowl.mp4',         exec: 'static/videos/result_smallbowl.mp4',         poster: 'static/posters/result_smallbowl.jpg' },
+    { name: 'Serving bowl', gen: 'static/videos/gen_servingbowl_small.mp4', exec: 'static/videos/result_servingbowl_small.mp4', poster: 'static/posters/result_servingbowl_small.jpg' },
   ];
-  const video = document.getElementById('teaser-video');
-  const segWrap = document.getElementById('vt-segs');
-  const labWrap = document.getElementById('vt-labels');
-  if (video && segWrap && labWrap) {
-    const seek = (t) => { try { video.currentTime = t + 0.01; } catch(e){} video.play().catch(()=>{}); };
-    const chapEnd = (i, dur) => (i < CHAPTERS.length - 1 ? CHAPTERS[i + 1].t : dur);
+  const scVideo = document.getElementById('sc-video');
+  const scObjs = document.getElementById('sc-objs');
+  const scSteps = document.querySelectorAll('.sc-step');
+  if (scVideo && scObjs) {
+    let curObj = 0, curStep = 'gen';
 
-    function build() {
-      const dur = video.duration || (CHAPTERS[CHAPTERS.length - 1].t + 5);
-      segWrap.innerHTML = ''; labWrap.innerHTML = '';
-      CHAPTERS.forEach((c, i) => {
-        const span = Math.max(0.5, chapEnd(i, dur) - c.t);
-        const seg = document.createElement('div');
-        seg.className = 'vt-seg'; seg.style.flexGrow = span; seg.style.flexBasis = '0';
-        seg.innerHTML = '<span class="fill"></span>';
-        seg.addEventListener('click', () => seek(c.t));
-        segWrap.appendChild(seg);
+    // build object selector
+    OBJECTS.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.className = 'sc-obj' + (i === 0 ? ' active' : '');
+      b.innerHTML = '<img src="' + o.poster + '" alt="' + o.name + '"><span>' + o.name + '</span>';
+      b.addEventListener('click', () => selectObject(i));
+      scObjs.appendChild(b);
+    });
 
-        const lab = document.createElement('button');
-        lab.className = 'vt-lab'; lab.style.flexGrow = span;
-        lab.innerHTML = '<span class="n">' + (i + 1) + '</span><span>' + c.label + '</span>';
-        lab.addEventListener('click', () => seek(c.t));
-        labWrap.appendChild(lab);
-      });
+    function setStepUI(step) {
+      scSteps.forEach(s => s.classList.toggle('active', s.dataset.step === step));
     }
-    function update() {
-      const dur = video.duration; if (!dur) return;
-      const t = video.currentTime;
-      let active = 0;
-      for (let i = 0; i < CHAPTERS.length; i++) if (t >= CHAPTERS[i].t) active = i;
-      const segs = segWrap.children, labs = labWrap.children;
-      CHAPTERS.forEach((c, i) => {
-        const span = chapEnd(i, dur) - c.t;
-        const pct = Math.max(0, Math.min(1, (t - c.t) / (span || 1)));
-        if (segs[i]) { segs[i].querySelector('.fill').style.width = (pct * 100) + '%'; segs[i].classList.toggle('active', i === active); }
-        if (labs[i]) labs[i].classList.toggle('active', i === active);
-      });
+    function playClip(step) {
+      curStep = step;
+      const o = OBJECTS[curObj];
+      scVideo.src = (step === 'gen' ? o.gen : o.exec);
+      scVideo.poster = o.poster;
+      setStepUI(step);
+      scVideo.load();
+      scVideo.play().catch(() => {});
     }
-    video.addEventListener('loadedmetadata', build);
-    video.addEventListener('timeupdate', update);
-    if (video.readyState >= 1) { build(); update(); }
+    function selectObject(i) {
+      curObj = i;
+      document.querySelectorAll('.sc-obj').forEach((b, j) => b.classList.toggle('active', j === i));
+      playClip('gen');
+    }
+    // auto-advance: gen -> exec -> (loop) gen
+    scVideo.addEventListener('ended', () => {
+      playClip(curStep === 'gen' ? 'exec' : 'gen');
+    });
+    scSteps.forEach(s => s.addEventListener('click', () => playClip(s.dataset.step)));
+
+    // init
+    selectObject(0);
+    // pause when off-screen, resume when back
+    new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) scVideo.play().catch(()=>{}); else scVideo.pause(); });
+    }, { threshold: 0.2 }).observe(scVideo);
   }
 
   /* ---- Pipeline stepper ---- */

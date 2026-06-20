@@ -35,9 +35,9 @@
   <!-- ================= HERO ================= -->
   <header class="hero" id="top">
     <div class="wrap">
-      <span class="eyebrow">Autonomous Real-World Data Collection</span>
-      <h1 class="title">AutoDex: Automated Dexterous Grasping Data Collection</h1>
-      <p class="tagline">Collecting real-world-validated dexterous grasps &mdash; successes <em>and</em> failures &mdash; on a physical robot, with no human in the per-trial loop.</p>
+      <span class="eyebrow">AutoDex &middot; Autonomous Real-World Data Collection</span>
+      <h1 class="title">A robot that collects its own dexterous-grasp data.</h1>
+      <p class="tagline">No teleoperation, no human in the loop. <b>AutoDex</b> proposes grasps in simulation, validates them on real hardware, and resets itself between trials &mdash; running unattended, overnight.</p>
 
       <div class="authors">
         <span class="a"><a href="mailto:willi19@snu.ac.kr">Mingi Choi</a><sup>1</sup>,</span>
@@ -58,20 +58,21 @@
       </div>
     </div>
 
-    <div class="wrap-wide" style="margin-top:2.6rem;">
-      <div class="frame reveal">
-        <video id="teaser-video" class="lazyplay" autoplay muted loop playsinline poster="static/images/teaser.png">
-          <source src="static/videos/teaser.mp4" type="video/mp4">
-        </video>
-      </div>
+    <!-- ============ INTERACTIVE SHOWCASE: pick object -> generate -> execute ============ -->
+    <div class="wrap-wide" style="margin-top:2.4rem;">
+      <div class="showcase" id="showcase">
+        <p class="sc-pick">Pick an object &mdash; AutoDex generates grasp candidates, then executes them on the real robot. No human in between.</p>
+        <div class="sc-objs" id="sc-objs"></div>
 
-      <!-- Chapter timeline (click a chapter to jump). Timings live in CHAPTERS in static/js/index.js -->
-      <div class="vtimeline" id="vtimeline" aria-label="Video chapters">
-        <div class="vt-segs" id="vt-segs"></div>
-        <div class="vt-labels" id="vt-labels"></div>
-      </div>
+        <div class="frame sc-stage">
+          <video id="sc-video" class="lazyplay" muted playsinline></video>
+        </div>
 
-      <p class="caption reveal"><b>AutoDex runs unattended.</b> Candidate grasps are generated in simulation, validated on a real multi-fingered hand under a 20-camera capture rig, and the workspace is reset autonomously between trials.</p>
+        <div class="sc-steps" id="sc-steps">
+          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
+          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -100,12 +101,34 @@
     </div>
   </section>
 
-  <!-- ================= WHY REAL VALIDATION ================= -->
+  <!-- ================= ASYMMETRY EXPLAINER ================= -->
   <section>
     <div class="wrap">
-      <div class="sec-eyebrow">Key Result</div>
+      <div class="sec-eyebrow">Why it works</div>
+      <h2 class="sec-title">The geometry&ndash;contact asymmetry</h2>
+      <p class="sec-sub">Simulation is trustworthy for one half of grasping and useless for the other. AutoDex is built around exactly that split.</p>
+      <div class="asym reveal">
+        <div class="asym-row pass">
+          <div class="asym-tag">Geometry</div>
+          <div class="asym-verdict">transfers from sim &#10003;</div>
+          <div class="asym-desc">IK solvability, collision avoidance, kinematic reachability &mdash; a grasp that is geometrically feasible in simulation is feasible on the real robot.</div>
+        </div>
+        <div class="asym-row fail">
+          <div class="asym-tag">Contact</div>
+          <div class="asym-verdict">doesn&rsquo;t &#10007;</div>
+          <div class="asym-desc">Friction, slip, finger-pad deformation, multi-finger force closure &mdash; none are exposed by the simulator, so contact validity can only be measured on hardware.</div>
+        </div>
+      </div>
+      <p class="asym-punch">So AutoDex lets <b>simulation cheaply propose</b> geometrically-feasible candidates, and makes the <b>real robot the contact oracle</b> that decides which ones actually hold.</p>
+    </div>
+  </section>
+
+  <!-- ================= WHY REAL VALIDATION ================= -->
+  <section class="soft">
+    <div class="wrap">
+      <div class="sec-eyebrow">The payoff</div>
       <h2 class="sec-title">Real-world validation more than doubles success</h2>
-      <p class="sec-sub">Many dominant dexterous failure modes &mdash; finger-pad deformation, micro-slip, force closure across simultaneous contacts &mdash; are not parameters any simulator exposes. Validating candidates on real hardware fixes that.</p>
+      <p class="sec-sub">Because contact doesn&rsquo;t transfer, grasps that pass in simulation routinely fail on hardware. Validating each candidate on the real robot is what closes the gap.</p>
       <div class="cmp reveal">
         <div class="cmp-row">
           <div class="cmp-head"><span>AutoDex-validated database <span class="tag">(real execution)</span></span><span class="pct" style="color:var(--accent)">76%</span></div>
@@ -121,7 +144,7 @@
   </section>
 
   <!-- ================= SYSTEM OVERVIEW ================= -->
-  <section class="soft">
+  <section>
     <div class="wrap-wide">
       <div class="sec-eyebrow">System</div>
       <h2 class="sec-title">How AutoDex works</h2>
@@ -131,11 +154,11 @@
   </section>
 
   <!-- ================= PIPELINE STEPPER ================= -->
-  <section id="pipeline">
+  <section class="soft" id="pipeline">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">Pipeline</div>
-      <h2 class="sec-title">An autonomous loop, ~150&nbsp;s per sample</h2>
-      <p class="sec-sub">Click each stage to see it run.</p>
+      <div class="sec-eyebrow">The autonomous loop</div>
+      <h2 class="sec-title">Four stages, no human in the loop</h2>
+      <p class="sec-sub">From candidate to labeled trajectory in ~150&nbsp;s &mdash; generation, selection, execution, and reset all run unattended. Click each stage.</p>
 
       <div class="stepper reveal">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Generate &amp; pre-filter</div>
@@ -166,33 +189,17 @@
   </section>
 
   <!-- ================= DATASET ================= -->
-  <section class="soft" id="dataset">
+  <section id="dataset">
     <div class="wrap-wide">
       <div class="sec-eyebrow">Dataset</div>
       <h2 class="sec-title">The AutoDex Dataset</h2>
       <p class="sec-sub">Real-world-validated dexterous grasps &mdash; successes and failures &mdash; with synchronized multi-view observations and robot-state logs, captured by a 20-view RGB rig across four scene types.</p>
 
-      <div class="stat-strip" style="margin-bottom:2.6rem;">
+      <div class="stat-strip">
         <div class="stat"><div class="num">3,593</div><div class="lbl">validated grasps</div></div>
         <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
         <div class="stat"><div class="num">4</div><div class="lbl">scene types</div></div>
         <div class="stat"><div class="num">2</div><div class="lbl">hands (Allegro, Inspire)</div></div>
-      </div>
-
-      <h3 class="sec-title" style="font-size:1.4rem; margin-bottom:1.6rem;">Explore validated grasps</h3>
-      <div class="gallery reveal">
-        <div class="gallery-main">
-          <div class="frame"><video id="gallery-video" class="lazyplay" autoplay muted loop playsinline poster="static/posters/result_donut.jpg"><source src="static/videos/result_donut.mp4" type="video/mp4"></video></div>
-          <div class="gallery-name" id="gallery-name">Donut</div>
-        </div>
-        <div class="thumbs">
-          <div class="thumb active" data-name="Donut" data-src="static/videos/result_donut.mp4" data-poster="static/posters/result_donut.jpg"><img src="static/posters/result_donut.jpg" alt="donut"><div class="cap">donut</div></div>
-          <div class="thumb" data-name="Blue vase" data-src="static/videos/result_bluevase.mp4" data-poster="static/posters/result_bluevase.jpg"><img src="static/posters/result_bluevase.jpg" alt="blue vase"><div class="cap">blue vase</div></div>
-          <div class="thumb" data-name="Brush" data-src="static/videos/result_beige_brush.mp4" data-poster="static/posters/result_beige_brush.jpg"><img src="static/posters/result_beige_brush.jpg" alt="brush"><div class="cap">brush</div></div>
-          <div class="thumb" data-name="Small bowl" data-src="static/videos/result_smallbowl.mp4" data-poster="static/posters/result_smallbowl.jpg"><img src="static/posters/result_smallbowl.jpg" alt="small bowl"><div class="cap">small bowl</div></div>
-          <div class="thumb" data-name="Serving bowl" data-src="static/videos/result_servingbowl_small.mp4" data-poster="static/posters/result_servingbowl_small.jpg"><img src="static/posters/result_servingbowl_small.jpg" alt="serving bowl"><div class="cap">serving bowl</div></div>
-          <div class="thumb" data-name="Soap tray" data-src="static/videos/result_soap_tray.mp4" data-poster="static/posters/result_soap_tray.jpg"><img src="static/posters/result_soap_tray.jpg" alt="soap tray"><div class="cap">soap tray</div></div>
-        </div>
       </div>
     </div>
   </section>
