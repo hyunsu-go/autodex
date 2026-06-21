@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AutoDex: An Automated Real-World System for Dexterous Grasping Data Collection</title>
-  <meta name="description" content="AutoDex is an autonomous real-world data-collection system for multi-finger dexterous grasping: it generates candidate grasps in simulation, selects them under a coverage-preserving budget, and validates them on a physical robot fully unattended.">
-  <meta property="og:title" content="AutoDex: Automated Real-World Dexterous Grasping Data Collection">
-  <meta property="og:description" content="An autonomous real-world system that generates, selects, and validates dexterous grasps without a human in the loop.">
-  <meta property="og:image" content="static/images/teaser.png">
+  <meta name="description" content="AutoDex is an autonomous robot system that runs the entire dexterous-grasp data-collection loop by itself — perceiving, grasping, labeling, and resetting — with no human in the loop.">
+  <meta property="og:title" content="AutoDex: a robot that collects its own dexterous-grasp data">
+  <meta property="og:description" content="AutoDex runs the entire grasp-data-collection loop by itself — no teleoperation, no human in the loop.">
+  <meta property="og:image" content="static/images/loop_poster.jpg">
   <meta property="og:type" content="website">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,10 +21,10 @@
   <!-- ================= NAVBAR ================= -->
   <nav class="nav">
     <div class="wrap-wide nav-inner">
-      <a href="#top" class="nav-logo">Auto<span class="dot">Dex</span></a>
+      <a href="#top" class="nav-logo">AutoDex</a>
       <div class="nav-links">
-        <a class="navlink" href="#abstract" data-sec="abstract">Abstract</a>
-        <a class="navlink" href="#pipeline" data-sec="pipeline">Pipeline</a>
+        <a class="navlink" href="#loop" data-sec="loop">The loop</a>
+        <a class="navlink" href="#reset" data-sec="reset">Reset</a>
         <a class="navlink" href="#dataset" data-sec="dataset">Dataset</a>
         <a class="navlink" href="#bibtex" data-sec="bibtex">BibTeX</a>
         <a class="nav-cta" href="#" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
@@ -35,9 +35,9 @@
   <!-- ================= HERO ================= -->
   <header class="hero" id="top">
     <div class="wrap">
-      <span class="eyebrow">AutoDex &middot; Autonomous Real-World Data Collection</span>
+      <span class="eyebrow">AutoDex</span>
       <h1 class="title">A robot that collects its own dexterous-grasp data.</h1>
-      <p class="tagline">No teleoperation, no human in the loop. <b>AutoDex</b> proposes grasps in simulation, validates them on real hardware, and resets itself between trials &mdash; running unattended, overnight.</p>
+      <p class="tagline">AutoDex runs the entire data-collection loop by itself &mdash; perceiving, grasping, judging success, and resetting the object &mdash; with <b>no human in the loop</b>.</p>
 
       <div class="authors">
         <span class="a"><a href="mailto:willi19@snu.ac.kr">Mingi Choi</a><sup>1</sup>,</span>
@@ -58,21 +58,15 @@
       </div>
     </div>
 
-    <!-- ============ INTERACTIVE SHOWCASE: pick object -> generate -> execute ============ -->
+    <!-- The autonomous loop, running -->
     <div class="wrap-wide" style="margin-top:2.4rem;">
-      <div class="showcase" id="showcase">
-        <p class="sc-pick">Pick an object &mdash; AutoDex generates grasp candidates, then executes them on the real robot. No human in between.</p>
-        <div class="sc-objs" id="sc-objs"></div>
-
-        <div class="frame sc-stage">
-          <video id="sc-video" class="lazyplay" muted playsinline></video>
-        </div>
-
-        <div class="sc-steps" id="sc-steps">
-          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
-          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
-        </div>
+      <div class="frame hero-video">
+        <span class="live-badge"><span class="dot"></span> Running unattended &middot; 6&times; speed</span>
+        <video class="lazyplay" autoplay muted loop playsinline poster="static/images/loop_poster.jpg">
+          <source src="static/videos/loop.mp4" type="video/mp4">
+        </video>
       </div>
+      <p class="caption">One robot, one workcell, no operator. AutoDex executes candidate grasps on real hardware and resets itself between trials &mdash; running for hours without supervision.</p>
     </div>
   </header>
 
@@ -80,10 +74,10 @@
   <section style="padding:2.5rem 0;">
     <div class="wrap-wide">
       <div class="stat-strip">
-        <div class="stat"><div class="num">3,593</div><div class="lbl">validated grasps</div></div>
-        <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
-        <div class="stat"><div class="num">76%</div><div class="lbl">grasp success (vs 34% sim-only)</div></div>
+        <div class="stat"><div class="num">3,593</div><div class="lbl">grasps collected</div></div>
+        <div class="stat"><div class="num">0</div><div class="lbl">humans in the loop</div></div>
         <div class="stat"><div class="num">4.8&times;</div><div class="lbl">faster than teleoperation</div></div>
+        <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
       </div>
     </div>
   </section>
@@ -93,109 +87,74 @@
     <div class="wrap">
       <div class="sec-eyebrow">Overview</div>
       <h2 class="sec-title">Abstract</h2>
-      <div class="prose reveal">
-        <p>Dexterous grasping requires real-world data, yet existing collection paradigms force a choice between simulation (cheap but contact-unreliable) and human teleoperation (faithful but unscalable). We argue that the underlying obstacle is a structural property of the problem: sim-to-real transfer for grasping is <em>asymmetric</em> &mdash; geometric feasibility (IK solvability, collision avoidance, kinematic reachability) transfers reliably from simulation, while contact dynamics (friction, slip, multi-finger force closure) do not.</p>
-        <p>We present <b>AutoDex</b>, an automated real-world data-collection system that uses simulation to propose geometrically feasible grasps and physical execution with a multi-fingered hand to validate grasp stability. AutoDex closes the full loop without human intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, actively resets the object for the next trial, and logs each trajectory.</p>
-        <p>Using AutoDex, we collect <b>3,593</b> real-world-validated grasps across the Allegro and Inspire hands on <b>100</b> diverse objects, including both successful and failed trials. For a matched 500-trajectory collection, AutoDex requires 10.3&nbsp;h versus 49.4&nbsp;h for teleoperation &mdash; a <b>4.8&times;</b> throughput improvement &mdash; and real-world validation raises grasp success from <b>34%</b> under simulation-only validation to <b>76%</b>.</p>
+      <div class="prose">
+        <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex removes the human from the per-trial loop entirely. It is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
+        <p>The system closes the full loop without intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
       </div>
     </div>
   </section>
 
-  <!-- ================= ASYMMETRY EXPLAINER ================= -->
-  <section>
-    <div class="wrap">
-      <div class="sec-eyebrow">Why it works</div>
-      <h2 class="sec-title">The geometry&ndash;contact asymmetry</h2>
-      <p class="sec-sub">Simulation is trustworthy for one half of grasping and useless for the other. AutoDex is built around exactly that split.</p>
-      <div class="asym reveal">
-        <div class="asym-row pass">
-          <div class="asym-tag">Geometry</div>
-          <div class="asym-verdict">transfers from sim &#10003;</div>
-          <div class="asym-desc">IK solvability, collision avoidance, kinematic reachability &mdash; a grasp that is geometrically feasible in simulation is feasible on the real robot.</div>
-        </div>
-        <div class="asym-row fail">
-          <div class="asym-tag">Contact</div>
-          <div class="asym-verdict">doesn&rsquo;t &#10007;</div>
-          <div class="asym-desc">Friction, slip, finger-pad deformation, multi-finger force closure &mdash; none are exposed by the simulator, so contact validity can only be measured on hardware.</div>
-        </div>
-      </div>
-      <p class="asym-punch">So AutoDex lets <b>simulation cheaply propose</b> geometrically-feasible candidates, and makes the <b>real robot the contact oracle</b> that decides which ones actually hold.</p>
-    </div>
-  </section>
-
-  <!-- ================= WHY REAL VALIDATION ================= -->
-  <section class="soft">
-    <div class="wrap">
-      <div class="sec-eyebrow">The payoff</div>
-      <h2 class="sec-title">Real-world validation more than doubles success</h2>
-      <p class="sec-sub">Because contact doesn&rsquo;t transfer, grasps that pass in simulation routinely fail on hardware. Validating each candidate on the real robot is what closes the gap.</p>
-      <div class="cmp reveal">
-        <div class="cmp-row">
-          <div class="cmp-head"><span>AutoDex-validated database <span class="tag">(real execution)</span></span><span class="pct" style="color:var(--accent)">76%</span></div>
-          <div class="cmp-track"><div class="cmp-fill win" style="width:76%"></div></div>
-        </div>
-        <div class="cmp-row">
-          <div class="cmp-head"><span>Raw generator database <span class="tag">(sim-only)</span></span><span class="pct" style="color:var(--muted)">34%</span></div>
-          <div class="cmp-track"><div class="cmp-fill lose" style="width:34%"></div></div>
-        </div>
-        <p class="caption" style="margin-top:1.4rem;">Retrieval-execution success across four scene types. The gain holds across material, scene, and weight categories &mdash; and is largest in cluttered scenes, where validated grasps still reach 80&ndash;90% success.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= SYSTEM OVERVIEW ================= -->
-  <section>
-    <div class="wrap-wide">
-      <div class="sec-eyebrow">System</div>
-      <h2 class="sec-title">How AutoDex works</h2>
-      <p class="sec-sub">Given a candidate generator and a multi-fingered hand, AutoDex executes each candidate, observes its physical outcome, and resets the workspace &mdash; producing ground-truth labels with no teleoperator.</p>
-      <div class="frame reveal" style="background:#fff;"><img src="static/images/system.png" alt="AutoDex system overview"></div>
-    </div>
-  </section>
-
-  <!-- ================= PIPELINE STEPPER ================= -->
-  <section class="soft" id="pipeline">
+  <!-- ================= THE LOOP ================= -->
+  <section id="loop">
     <div class="wrap-wide">
       <div class="sec-eyebrow">The autonomous loop</div>
-      <h2 class="sec-title">Four stages, no human in the loop</h2>
-      <p class="sec-sub">From candidate to labeled trajectory in ~150&nbsp;s &mdash; generation, selection, execution, and reset all run unattended. Click each stage.</p>
+      <h2 class="sec-title">The cycle it repeats by itself</h2>
+      <p class="sec-sub">Every trial runs these four steps with no human at any of them &mdash; then the loop closes and starts the next grasp. Click a step.</p>
 
-      <div class="stepper reveal">
-        <div class="step-tab active" data-step="1"><span class="n">1</span> Generate &amp; pre-filter</div>
-        <div class="step-tab" data-step="2"><span class="n">2</span> Coverage selection</div>
-        <div class="step-tab" data-step="3"><span class="n">3</span> Real execution</div>
-        <div class="step-tab" data-step="4"><span class="n">4</span> Autonomous reset</div>
+      <div class="stepper">
+        <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
+        <div class="step-tab" data-step="2"><span class="n">2</span> Plan &amp; grasp</div>
+        <div class="step-tab" data-step="3"><span class="n">3</span> Lift &amp; label</div>
+        <div class="step-tab" data-step="4"><span class="n">4</span> Reset &nbsp;&#8635;</div>
       </div>
 
-      <div class="reveal">
+      <div>
         <div class="step-panel active" data-step="1">
-          <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
-          <div><h3>Generate &amp; pre-filter</h3><p>Candidate grasps are generated in simulation inside virtual-obstacle scenes, then pre-filtered under deliberately optimistic settings &mdash; keeping every geometrically feasible candidate while discarding the impossible ones cheaply.</p></div>
+          <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
+          <div><h3>1 &middot; Perceive</h3><p>A dense 20-camera rig localizes the object &mdash; even under severe hand&ndash;object occlusion &mdash; and reconstructs the surrounding scene, so the system knows exactly what it is grasping and where.</p></div>
         </div>
         <div class="step-panel" data-step="2">
-          <div class="frame"><video muted loop playsinline poster="static/posters/coverage.jpg"><source src="static/videos/coverage.mp4" type="video/mp4"></video></div>
-          <div><h3>Coverage-aware selection</h3><p>Selection allocates the limited real-execution budget across the four scene types, prioritizing candidates that cover the most scene constraints before committing robot time.</p></div>
+          <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
+          <div><h3>2 &middot; Plan &amp; grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact so the robot can run unsupervised.</p></div>
         </div>
         <div class="step-panel" data-step="3">
-          <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
-          <div><h3>Real-world execution</h3><p>Motion planning produces a collision-free trajectory; a dense 20-camera synchronized RGB rig tracks object and hand throughout each lift-and-hold trial, yielding a ground-truth success/failure label.</p></div>
+          <div class="frame"><video muted loop playsinline poster="static/posters/result_donut.jpg"><source src="static/videos/result_donut.mp4" type="video/mp4"></video></div>
+          <div><h3>3 &middot; Lift &amp; label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both the wins and the misses.</p></div>
         </div>
         <div class="step-panel" data-step="4">
           <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
-          <div><h3>Autonomous reset</h3><p>A hardware-aware sequential reset restores the workspace between trials &mdash; letting the system run fully unattended overnight and collect both successes and failures at scale.</p></div>
+          <div><h3>4 &middot; Reset &#8635;</h3><p>The object is rarely where the next trial needs it. AutoDex re-grasps and re-poses it to the next target pose by itself &mdash; the step that lets the loop never stop. Then it begins again.</p></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ================= DATASET ================= -->
+  <!-- ================= RESET SPOTLIGHT ================= -->
+  <section class="soft" id="reset">
+    <div class="wrap-wide">
+      <div class="sec-eyebrow">The hard part</div>
+      <h2 class="sec-title">Why it can run unattended: it resets itself</h2>
+      <p class="sec-sub">Every other real-world pipeline stops when a human has to re-place the object. AutoDex doesn&rsquo;t. When a trial ends, the robot re-grasps the object and actively places it into the next pose &mdash; even pose transitions that passive dropping can almost never reach.</p>
+      <div class="two-up">
+        <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
+        <div class="two-up-text">
+          <p><b>No human re-placement.</b> Active reset is what turns a sequence of single grasps into hours of continuous, unsupervised collection.</p>
+          <p>It also keeps coverage broad: the robot can drive the object into specific, otherwise-unreachable orientations, so the dataset isn&rsquo;t biased toward whatever pose the object happens to settle in.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DATASET / SCALE ================= -->
   <section id="dataset">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">Dataset</div>
-      <h2 class="sec-title">The AutoDex Dataset</h2>
-      <p class="sec-sub">Real-world-validated dexterous grasps &mdash; successes and failures &mdash; with synchronized multi-view observations and robot-state logs, captured by a 20-view RGB rig across four scene types.</p>
+      <div class="sec-eyebrow">The result</div>
+      <h2 class="sec-title">3,593 grasps. Zero humans.</h2>
+      <p class="sec-sub">Running unattended, AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; with synchronized 20-view observations and robot-state logs.</p>
 
-      <div class="stat-strip">
+      <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
+
+      <div class="stat-strip" style="margin-top:2.4rem;">
         <div class="stat"><div class="num">3,593</div><div class="lbl">validated grasps</div></div>
         <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
         <div class="stat"><div class="num">4</div><div class="lbl">scene types</div></div>
@@ -205,11 +164,11 @@
   </section>
 
   <!-- ================= BIBTEX ================= -->
-  <section id="bibtex">
+  <section class="soft" id="bibtex">
     <div class="wrap">
       <div class="sec-eyebrow">Cite</div>
       <h2 class="sec-title">BibTeX</h2>
-      <div class="bib reveal">
+      <div class="bib">
         <button class="copy-btn" id="copy-bib">Copy</button>
         <pre class="bibtex" id="bibtex-text">@misc{choi2026autodex,
   title  = {AutoDex: An Automated Real-World System for Dexterous Grasping Data Collection},
@@ -224,7 +183,6 @@
   <footer>
     <div class="wrap">
       <p>Project page for <b>AutoDex</b>. &nbsp;&middot;&nbsp; <a href="mailto:willi19@snu.ac.kr">willi19@snu.ac.kr</a></p>
-      <p style="margin-top:.5rem; font-size:.88rem;">Design inspired by modern academic project page templates.</p>
     </div>
   </footer>
 
