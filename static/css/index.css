@@ -58,8 +58,8 @@ a:hover { text-decoration: underline; }
   font-size: clamp(3rem, 9vw, 5.5rem); color: var(--ink); margin: 0 auto;
 }
 .subtitle {
-  font-size: clamp(1.2rem, 2.6vw, 1.6rem); font-weight: 600; color: var(--ink);
-  margin: .9rem auto 0; max-width: 40ch; line-height: 1.3;
+  font-size: clamp(1.1rem, 2.2vw, 1.42rem); font-weight: 600; color: var(--ink);
+  margin: .9rem auto 0; max-width: 48rem; line-height: 1.3; text-wrap: balance;
 }
 .tagline { color: var(--muted); font-size: 1.08rem; margin: 1.2rem auto 0; max-width: 62ch; line-height: 1.65; }
 
