@@ -1,6 +1,19 @@
 /* ===================== AutoDex page interactions ===================== */
 document.addEventListener('DOMContentLoaded', function () {
 
+  /* ---- Transparent nav over the full-screen hero, solid after scroll ---- */
+  const navEl = document.querySelector('.nav');
+  const fvEl = document.querySelector('.fullvideo');
+  if (navEl) {
+    const onNavScroll = () => {
+      const threshold = (fvEl ? fvEl.offsetHeight : 300) - 70;
+      navEl.classList.toggle('solid', window.scrollY > threshold);
+    };
+    window.addEventListener('scroll', onNavScroll, { passive: true });
+    window.addEventListener('resize', onNavScroll);
+    onNavScroll();
+  }
+
   /* ---- Interactive showcase: pick object -> generate -> execute ---- */
   const OBJECTS = [
     { name: 'Donut',        gen: 'static/videos/gen_donut.mp4',             exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
