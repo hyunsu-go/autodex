@@ -24,7 +24,7 @@
       <a href="#top" class="nav-logo">AutoDex</a>
       <div class="nav-links">
         <a class="navlink" href="#loop" data-sec="loop">The loop</a>
-        <a class="navlink" href="#reset" data-sec="reset">Reset</a>
+        <a class="navlink" href="#explore" data-sec="explore">Demo</a>
         <a class="navlink" href="#dataset" data-sec="dataset">Dataset</a>
         <a class="navlink" href="#bibtex" data-sec="bibtex">BibTeX</a>
         <a class="nav-cta" href="#" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
@@ -84,7 +84,6 @@
   <!-- ================= ABSTRACT ================= -->
   <section class="soft" id="abstract">
     <div class="wrap">
-      <div class="sec-eyebrow">Overview</div>
       <h2 class="sec-title">Abstract</h2>
       <div class="prose">
         <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
@@ -96,7 +95,6 @@
   <!-- ================= THE LOOP ================= -->
   <section id="loop">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">The collection loop</div>
       <h2 class="sec-title">The cycle behind every grasp</h2>
       <p class="sec-sub">Every trial runs these four steps automatically &mdash; then the loop closes and starts the next grasp. Click a step.</p>
 
@@ -131,7 +129,6 @@
   <!-- ================= INTERACTIVE SHOWCASE ================= -->
   <section class="soft" id="explore">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">See it work</div>
       <h2 class="sec-title">Pick an object, watch it run</h2>
       <p class="sec-sub">Candidate grasps are generated in simulation, then automatically executed on the real robot.</p>
       <div class="showcase" id="showcase">
@@ -147,26 +144,9 @@
     </div>
   </section>
 
-  <!-- ================= RESET SPOTLIGHT ================= -->
-  <section id="reset">
-    <div class="wrap-wide">
-      <div class="sec-eyebrow">The hard part</div>
-      <h2 class="sec-title">It resets the object by itself</h2>
-      <p class="sec-sub">A simple pipeline stalls when the object has to be re-placed between trials. AutoDex automates this step: when a trial ends, the robot re-grasps the object and actively places it into the next pose &mdash; even pose transitions that passive dropping can almost never reach.</p>
-      <div class="two-up">
-        <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
-        <div class="two-up-text">
-          <p><b>Automated re-placement.</b> Active reset is what turns a sequence of single grasps into long, continuous collection runs.</p>
-          <p>It also keeps coverage broad: the robot can drive the object into specific, otherwise-unreachable orientations, so the dataset isn&rsquo;t biased toward whatever pose the object happens to settle in.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ================= DATASET / SCALE ================= -->
-  <section class="soft" id="dataset">
+  <section id="dataset">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">The result</div>
       <h2 class="sec-title">3,593 validated grasps</h2>
       <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; across four scene types, with synchronized 20-view observations and robot-state logs.</p>
 
@@ -175,9 +155,8 @@
   </section>
 
   <!-- ================= BIBTEX ================= -->
-  <section id="bibtex">
+  <section class="soft" id="bibtex">
     <div class="wrap">
-      <div class="sec-eyebrow">Cite</div>
       <h2 class="sec-title">BibTeX</h2>
       <div class="bib">
         <button class="copy-btn" id="copy-bib">Copy</button>
