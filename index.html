@@ -115,7 +115,7 @@
           <div><h3>2 &middot; Plan &amp; grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact during automated runs.</p></div>
         </div>
         <div class="step-panel" data-step="3">
-          <div class="frame"><video muted loop playsinline poster="static/posters/result_donut.jpg"><source src="static/videos/result_donut.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
           <div><h3>3 &middot; Lift &amp; label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both the wins and the misses.</p></div>
         </div>
         <div class="step-panel" data-step="4">
@@ -130,15 +130,15 @@
   <section class="soft" id="explore">
     <div class="wrap-wide">
       <h2 class="sec-title">Pick an object, watch it run</h2>
-      <p class="sec-sub">Candidate grasps are generated in simulation, then automatically executed on the real robot.</p>
+      <p class="sec-sub">For each object, AutoDex validates candidate grasps across scene constraints on the real robot, then executes the chosen grasp.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
         <div class="frame sc-stage">
           <video id="sc-video" class="lazyplay" muted playsinline></video>
         </div>
         <div class="sc-steps" id="sc-steps">
-          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
-          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
+          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Coverage across scenes <small>on the real robot</small></span></button>
+          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Grasp execution <small>lift &amp; hold</small></span></button>
         </div>
       </div>
     </div>
