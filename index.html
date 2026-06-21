@@ -58,15 +58,21 @@
       </div>
     </div>
 
-    <!-- The autonomous loop, running -->
+    <!-- INTERACTIVE SHOWCASE: pick object -> generate -> execute -->
     <div class="wrap-wide" style="margin-top:2.4rem;">
-      <div class="frame hero-video">
-        <span class="live-badge"><span class="dot"></span> Running unattended &middot; 6&times; speed</span>
-        <video class="lazyplay" autoplay muted loop playsinline poster="static/images/loop_poster.jpg">
-          <source src="static/videos/loop.mp4" type="video/mp4">
-        </video>
+      <div class="showcase" id="showcase">
+        <p class="sc-pick">Pick an object &mdash; AutoDex generates grasp candidates, then executes them on the real robot. No human in between.</p>
+        <div class="sc-objs" id="sc-objs"></div>
+
+        <div class="frame sc-stage">
+          <video id="sc-video" class="lazyplay" muted playsinline></video>
+        </div>
+
+        <div class="sc-steps" id="sc-steps">
+          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
+          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
+        </div>
       </div>
-      <p class="caption">One robot, one workcell, no operator. AutoDex executes candidate grasps on real hardware and resets itself between trials &mdash; running for hours without supervision.</p>
     </div>
   </header>
 
@@ -100,6 +106,13 @@
       <div class="sec-eyebrow">The autonomous loop</div>
       <h2 class="sec-title">The cycle it repeats by itself</h2>
       <p class="sec-sub">Every trial runs these four steps with no human at any of them &mdash; then the loop closes and starts the next grasp. Click a step.</p>
+
+      <div class="frame hero-video" style="margin-bottom:2.2rem;">
+        <span class="live-badge"><span class="dot"></span> Running unattended &middot; 6&times; speed</span>
+        <video class="lazyplay" autoplay muted loop playsinline poster="static/images/loop_poster.jpg">
+          <source src="static/videos/loop.mp4" type="video/mp4">
+        </video>
+      </div>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
