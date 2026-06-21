@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AutoDex: An Automated Real-World System for Dexterous Grasping Data Collection</title>
-  <meta name="description" content="AutoDex is an autonomous robot system that runs the entire dexterous-grasp data-collection loop by itself — perceiving, grasping, labeling, and resetting — with no human in the loop.">
-  <meta property="og:title" content="AutoDex: a robot that collects its own dexterous-grasp data">
-  <meta property="og:description" content="AutoDex runs the entire grasp-data-collection loop by itself — no teleoperation, no human in the loop.">
+  <meta name="description" content="AutoDex is an automated real-world system for dexterous-grasp data collection: it generates grasps in simulation, executes and validates them on a real multi-fingered hand, and resets the object between trials.">
+  <meta property="og:title" content="AutoDex: Automated Real-World Dexterous-Grasp Data Collection">
+  <meta property="og:description" content="An automated real-world system that generates, executes, and validates dexterous grasps on a physical robot — far faster than teleoperation.">
   <meta property="og:image" content="static/images/loop_poster.jpg">
   <meta property="og:type" content="website">
 
@@ -33,13 +33,13 @@
   </nav>
 
   <!-- ================= HERO ================= -->
-  <!-- ============ FULL-SCREEN UNATTENDED DATA-COLLECTION VIDEO ============ -->
+  <!-- ============ FULL-SCREEN HERO VIDEO ============ -->
   <section class="fullvideo" id="top">
     <video class="lazyplay" autoplay muted loop playsinline poster="static/images/loop_poster.jpg">
       <source src="static/videos/loop.mp4" type="video/mp4">
     </video>
-    <span class="live-badge"><span class="dot"></span> Running unattended &middot; 6&times; speed</span>
-    <div class="fv-caption">AutoDex collects dexterous-grasp data on its own &mdash; one robot, no operator, for hours.</div>
+    <span class="live-badge"><span class="dot"></span> Autonomous execution &middot; 6&times; speed</span>
+    <div class="fv-caption">AutoDex executes and validates dexterous grasps on real hardware &mdash; far faster than teleoperation.</div>
     <a href="#lead" class="scroll-hint" aria-label="Scroll down"><i class="fas fa-chevron-down"></i></a>
   </section>
 
@@ -47,7 +47,7 @@
     <div class="wrap hero-titleblock">
       <span class="eyebrow">AutoDex</span>
       <h1 class="title">A robot that collects its own dexterous-grasp data.</h1>
-      <p class="tagline">AutoDex runs the entire data-collection loop by itself &mdash; perceiving, grasping, judging success, and resetting the object &mdash; with <b>no human in the loop</b>.</p>
+      <p class="tagline">AutoDex automates grasp execution, success labeling, and object reset &mdash; collecting real-world dexterous-grasp data with <b>far less manual effort than teleoperation</b>.</p>
 
       <div class="authors">
         <span class="a"><a href="mailto:willi19@snu.ac.kr">Mingi Choi</a><sup>1</sup>,</span>
@@ -74,7 +74,7 @@
     <div class="wrap-wide">
       <div class="stat-strip">
         <div class="stat"><div class="num">3,593</div><div class="lbl">grasps collected</div></div>
-        <div class="stat"><div class="num">0</div><div class="lbl">humans in the loop</div></div>
+        <div class="stat"><div class="num">76%</div><div class="lbl">grasp success (vs 34% sim-only)</div></div>
         <div class="stat"><div class="num">4.8&times;</div><div class="lbl">faster than teleoperation</div></div>
         <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
       </div>
@@ -87,8 +87,8 @@
       <div class="sec-eyebrow">Overview</div>
       <h2 class="sec-title">Abstract</h2>
       <div class="prose">
-        <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex removes the human from the per-trial loop entirely. It is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
-        <p>The system closes the full loop without intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
+        <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
+        <p>The system automates the collection loop: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
       </div>
     </div>
   </section>
@@ -96,9 +96,9 @@
   <!-- ================= THE LOOP ================= -->
   <section id="loop">
     <div class="wrap-wide">
-      <div class="sec-eyebrow">The autonomous loop</div>
-      <h2 class="sec-title">The cycle it repeats by itself</h2>
-      <p class="sec-sub">Every trial runs these four steps with no human at any of them &mdash; then the loop closes and starts the next grasp. Click a step.</p>
+      <div class="sec-eyebrow">The collection loop</div>
+      <h2 class="sec-title">The cycle behind every grasp</h2>
+      <p class="sec-sub">Every trial runs these four steps automatically &mdash; then the loop closes and starts the next grasp. Click a step.</p>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
@@ -114,7 +114,7 @@
         </div>
         <div class="step-panel" data-step="2">
           <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
-          <div><h3>2 &middot; Plan &amp; grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact so the robot can run unsupervised.</p></div>
+          <div><h3>2 &middot; Plan &amp; grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact during automated runs.</p></div>
         </div>
         <div class="step-panel" data-step="3">
           <div class="frame"><video muted loop playsinline poster="static/posters/result_donut.jpg"><source src="static/videos/result_donut.mp4" type="video/mp4"></video></div>
@@ -122,7 +122,7 @@
         </div>
         <div class="step-panel" data-step="4">
           <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
-          <div><h3>4 &middot; Reset &#8635;</h3><p>The object is rarely where the next trial needs it. AutoDex re-grasps and re-poses it to the next target pose by itself &mdash; the step that lets the loop never stop. Then it begins again.</p></div>
+          <div><h3>4 &middot; Reset &#8635;</h3><p>The object is rarely where the next trial needs it. AutoDex re-grasps and re-poses it to the next target pose automatically &mdash; the step that keeps the loop going. Then it begins again.</p></div>
         </div>
       </div>
     </div>
@@ -133,7 +133,7 @@
     <div class="wrap-wide">
       <div class="sec-eyebrow">See it work</div>
       <h2 class="sec-title">Pick an object, watch it run</h2>
-      <p class="sec-sub">Candidate grasps are generated in simulation, then executed on the real robot &mdash; no human in between.</p>
+      <p class="sec-sub">Candidate grasps are generated in simulation, then automatically executed on the real robot.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
         <div class="frame sc-stage">
@@ -151,12 +151,12 @@
   <section id="reset">
     <div class="wrap-wide">
       <div class="sec-eyebrow">The hard part</div>
-      <h2 class="sec-title">Why it can run unattended: it resets itself</h2>
-      <p class="sec-sub">Every other real-world pipeline stops when a human has to re-place the object. AutoDex doesn&rsquo;t. When a trial ends, the robot re-grasps the object and actively places it into the next pose &mdash; even pose transitions that passive dropping can almost never reach.</p>
+      <h2 class="sec-title">It resets the object by itself</h2>
+      <p class="sec-sub">A simple pipeline stalls when the object has to be re-placed between trials. AutoDex automates this step: when a trial ends, the robot re-grasps the object and actively places it into the next pose &mdash; even pose transitions that passive dropping can almost never reach.</p>
       <div class="two-up">
         <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
         <div class="two-up-text">
-          <p><b>No human re-placement.</b> Active reset is what turns a sequence of single grasps into hours of continuous, unsupervised collection.</p>
+          <p><b>Automated re-placement.</b> Active reset is what turns a sequence of single grasps into long, continuous collection runs.</p>
           <p>It also keeps coverage broad: the robot can drive the object into specific, otherwise-unreachable orientations, so the dataset isn&rsquo;t biased toward whatever pose the object happens to settle in.</p>
         </div>
       </div>
@@ -167,8 +167,8 @@
   <section class="soft" id="dataset">
     <div class="wrap-wide">
       <div class="sec-eyebrow">The result</div>
-      <h2 class="sec-title">3,593 grasps. Zero humans.</h2>
-      <p class="sec-sub">Running unattended, AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; with synchronized 20-view observations and robot-state logs.</p>
+      <h2 class="sec-title">3,593 validated grasps</h2>
+      <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; with synchronized 20-view observations and robot-state logs.</p>
 
       <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
 
