@@ -12,6 +12,7 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+html, body { margin: 0; padding: 0; }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
   color: var(--body);
@@ -19,6 +20,7 @@ body {
   -webkit-font-smoothing: antialiased;
   line-height: 1.65;
   font-size: 17px;
+  overflow-x: hidden;
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -73,7 +75,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Full-screen hero video ---------- */
 .fullvideo { position:relative; width:100%; height:100vh; height:100svh; min-height:420px; background:#000; overflow:hidden; }
-.fullvideo > video { width:100%; height:100%; object-fit:cover; display:block; }
+.fullvideo > video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
 .fullvideo .live-badge { top:18px; left:18px; z-index:2; }
 .fv-caption {
   position:absolute; left:0; right:0; bottom:74px; text-align:center; color:#fff; z-index:2;
