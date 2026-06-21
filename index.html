@@ -34,7 +34,24 @@
 
   <!-- ================= HERO ================= -->
   <header class="hero" id="top">
-    <div class="wrap">
+    <!-- INTERACTIVE SHOWCASE: very top of the page -->
+    <div class="wrap-wide hero-showcase">
+      <div class="showcase" id="showcase">
+        <p class="sc-pick">Pick an object &mdash; AutoDex generates grasp candidates, then executes them on the real robot. No human in between.</p>
+        <div class="sc-objs" id="sc-objs"></div>
+
+        <div class="frame sc-stage">
+          <video id="sc-video" class="lazyplay" muted playsinline></video>
+        </div>
+
+        <div class="sc-steps" id="sc-steps">
+          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
+          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap hero-titleblock">
       <span class="eyebrow">AutoDex</span>
       <h1 class="title">A robot that collects its own dexterous-grasp data.</h1>
       <p class="tagline">AutoDex runs the entire data-collection loop by itself &mdash; perceiving, grasping, judging success, and resetting the object &mdash; with <b>no human in the loop</b>.</p>
@@ -55,23 +72,6 @@
         <a class="btn ghost" href="#" target="_blank" rel="noopener"><i class="fas fa-file-lines"></i> arXiv</a>
         <a class="btn ghost" href="https://github.com/willi19/autodex-code" target="_blank" rel="noopener"><i class="fab fa-github"></i> Code</a>
         <a class="btn ghost" href="#dataset"><i class="fas fa-database"></i> Dataset</a>
-      </div>
-    </div>
-
-    <!-- INTERACTIVE SHOWCASE: pick object -> generate -> execute -->
-    <div class="wrap-wide" style="margin-top:2.4rem;">
-      <div class="showcase" id="showcase">
-        <p class="sc-pick">Pick an object &mdash; AutoDex generates grasp candidates, then executes them on the real robot. No human in between.</p>
-        <div class="sc-objs" id="sc-objs"></div>
-
-        <div class="frame sc-stage">
-          <video id="sc-video" class="lazyplay" muted playsinline></video>
-        </div>
-
-        <div class="sc-steps" id="sc-steps">
-          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Grasp candidates generated <small>in simulation</small></span></button>
-          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Executed on the real robot <small>autonomously</small></span></button>
-        </div>
       </div>
     </div>
   </header>
