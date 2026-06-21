@@ -130,15 +130,11 @@
   <section class="soft" id="explore">
     <div class="wrap-wide">
       <h2 class="sec-title">Pick an object, watch it run</h2>
-      <p class="sec-sub">For each object, AutoDex validates candidate grasps across scene constraints on the real robot, then executes the chosen grasp.</p>
+      <p class="sec-sub">AutoDex executing validated grasps on the real robot. Pick an object.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
         <div class="frame sc-stage">
-          <video id="sc-video" class="lazyplay" muted playsinline></video>
-        </div>
-        <div class="sc-steps" id="sc-steps">
-          <button class="sc-step" data-step="gen"><span class="n">1</span><span class="t">Coverage across scenes <small>on the real robot</small></span></button>
-          <button class="sc-step" data-step="exec"><span class="n">2</span><span class="t">Grasp execution <small>lift &amp; hold</small></span></button>
+          <video id="sc-video" class="lazyplay" muted loop playsinline></video>
         </div>
       </div>
     </div>

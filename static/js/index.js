@@ -14,21 +14,17 @@ document.addEventListener('DOMContentLoaded', function () {
     onNavScroll();
   }
 
-  /* ---- Interactive showcase: pick object -> generate -> execute ---- */
+  /* ---- Interactive showcase: pick object -> watch the grasp ---- */
   const OBJECTS = [
-    { name: 'Donut',        gen: 'static/videos/gen_donut.mp4',             exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
-    { name: 'Blue vase',    gen: 'static/videos/gen_blue_vase.mp4',         exec: 'static/videos/result_bluevase.mp4',          poster: 'static/posters/result_bluevase.jpg' },
-    { name: 'Brush',        gen: 'static/videos/gen_beige_brush.mp4',       exec: 'static/videos/result_beige_brush.mp4',       poster: 'static/posters/result_beige_brush.jpg' },
-    { name: 'Small bowl',   gen: 'static/videos/gen_smallbowl.mp4',         exec: 'static/videos/result_smallbowl.mp4',         poster: 'static/posters/result_smallbowl.jpg' },
-    { name: 'Serving bowl', gen: 'static/videos/gen_servingbowl_small.mp4', exec: 'static/videos/result_servingbowl_small.mp4', poster: 'static/posters/result_servingbowl_small.jpg' },
+    { name: 'Donut',        exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
+    { name: 'Blue vase',    exec: 'static/videos/result_bluevase.mp4',          poster: 'static/posters/result_bluevase.jpg' },
+    { name: 'Brush',        exec: 'static/videos/result_beige_brush.mp4',       poster: 'static/posters/result_beige_brush.jpg' },
+    { name: 'Small bowl',   exec: 'static/videos/result_smallbowl.mp4',         poster: 'static/posters/result_smallbowl.jpg' },
+    { name: 'Serving bowl', exec: 'static/videos/result_servingbowl_small.mp4', poster: 'static/posters/result_servingbowl_small.jpg' },
   ];
   const scVideo = document.getElementById('sc-video');
   const scObjs = document.getElementById('sc-objs');
-  const scSteps = document.querySelectorAll('.sc-step');
   if (scVideo && scObjs) {
-    let curObj = 0, curStep = 'gen';
-
-    // build object selector
     OBJECTS.forEach((o, i) => {
       const b = document.createElement('button');
       b.className = 'sc-obj' + (i === 0 ? ' active' : '');
@@ -36,33 +32,15 @@ document.addEventListener('DOMContentLoaded', function () {
       b.addEventListener('click', () => selectObject(i));
       scObjs.appendChild(b);
     });
-
-    function setStepUI(step) {
-      scSteps.forEach(s => s.classList.toggle('active', s.dataset.step === step));
-    }
-    function playClip(step) {
-      curStep = step;
-      const o = OBJECTS[curObj];
-      scVideo.src = (step === 'gen' ? o.gen : o.exec);
+    function selectObject(i) {
+      document.querySelectorAll('.sc-obj').forEach((b, j) => b.classList.toggle('active', j === i));
+      const o = OBJECTS[i];
+      scVideo.src = o.exec;
       scVideo.poster = o.poster;
-      setStepUI(step);
       scVideo.load();
       scVideo.play().catch(() => {});
     }
-    function selectObject(i) {
-      curObj = i;
-      document.querySelectorAll('.sc-obj').forEach((b, j) => b.classList.toggle('active', j === i));
-      playClip('gen');
-    }
-    // auto-advance: gen -> exec -> (loop) gen
-    scVideo.addEventListener('ended', () => {
-      playClip(curStep === 'gen' ? 'exec' : 'gen');
-    });
-    scSteps.forEach(s => s.addEventListener('click', () => playClip(s.dataset.step)));
-
-    // init
     selectObject(0);
-    // pause when off-screen, resume when back
     new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.isIntersecting) scVideo.play().catch(()=>{}); else scVideo.pause(); });
     }, { threshold: 0.2 }).observe(scVideo);
