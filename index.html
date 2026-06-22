@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623o">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623p">
 </head>
 <body>
 
@@ -99,8 +99,8 @@
   <!-- ================= GRASP GENERATION ================= -->
   <section id="generate">
     <div class="wrap-wide">
-      <h2 class="sec-title">Grasp Generation</h2>
-      <p class="sec-sub">Before any robot runs, a replaceable simulation generator (BODex) proposes a large set of geometrically feasible candidate grasps for each object under scene constraints &mdash; wall, shelf, and box. They are collision-free with the object and obstacles, but their stability under real contact is left for AutoDex to test on hardware.</p>
+      <h2 class="sec-title">Candidate Generation</h2>
+      <p class="sec-sub">AutoDex starts with grasp candidates generated from an object mesh and a scene specification, such as a wall, shelf, or box. These constraints restrict the hand&rsquo;s approach directions and produce grasps for different surrounding environments. The candidates are geometrically feasible, but their real contact stability is determined only after AutoDex executes them on hardware.</p>
       <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/generation.jpg"><source src="static/videos/generation.mp4" type="video/mp4"></video></div>
     </div>
   </section>
@@ -191,6 +191,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623o"></script>
+  <script src="static/js/index.js?v=20260623p"></script>
 </body>
 </html>
