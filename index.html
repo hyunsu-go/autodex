@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623d">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623e">
 </head>
 <body>
 
@@ -74,7 +74,7 @@
     </div>
 
     <div class="wrap-wide" style="margin-top:1.6rem;">
-      <div class="frame" style="background:#fff;"><img src="static/images/teaser.png" alt="AutoDex pipeline overview"></div>
+      <div class="frame" style="background:transparent; border:none;"><img src="static/images/teaser.png" alt="AutoDex pipeline overview"></div>
       <p class="caption"><b>The AutoDex pipeline.</b> Each grasp candidate is validated by automatic real-world data collection, building the AutoDex database &mdash; which is then queried for in-the-wild execution via retrieval.</p>
     </div>
 
@@ -111,19 +111,19 @@
       <div>
         <div class="step-panel active" data-step="1">
           <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
-          <div><h3>1 &middot; Perceive</h3><p>A dense 20-camera rig localizes the object &mdash; even under severe hand&ndash;object occlusion &mdash; so the system knows exactly what it is grasping and where.</p></div>
+          <div class="step-text"><h3>1 &middot; Perceive</h3><p>A dense 20-camera rig localizes the object &mdash; even under severe hand&ndash;object occlusion &mdash; so the system knows exactly what it is grasping and where.</p></div>
         </div>
         <div class="step-panel" data-step="2">
           <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
-          <div><h3>2 &middot; Plan &amp; Grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with a residual-torque monitor guarding against unexpected collisions during automated runs.</p></div>
+          <div class="step-text"><h3>2 &middot; Plan &amp; Grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with a residual-torque monitor guarding against unexpected collisions during automated runs.</p></div>
         </div>
         <div class="step-panel" data-step="3">
           <div class="frame"><video muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
-          <div><h3>3 &middot; Lift &amp; Label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both successes and failures.</p></div>
+          <div class="step-text"><h3>3 &middot; Lift &amp; Label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both successes and failures.</p></div>
         </div>
         <div class="step-panel" data-step="4">
           <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
-          <div><h3>4 &middot; Reset &#8635;</h3><p>The object is rarely where the next trial needs it. AutoDex re-grasps and re-poses it to the next target pose automatically &mdash; the step that keeps the loop going. Then it begins again.</p></div>
+          <div class="step-text"><h3>4 &middot; Reset &#8635;</h3><p>The object is rarely where the next trial needs it. AutoDex re-grasps and re-poses it to the next target pose automatically &mdash; the step that keeps the loop going. Then it begins again.</p></div>
         </div>
       </div>
     </div>
@@ -175,6 +175,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623d"></script>
+  <script src="static/js/index.js?v=20260623e"></script>
 </body>
 </html>
