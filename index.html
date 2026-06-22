@@ -23,7 +23,7 @@
     <div class="wrap-wide nav-inner">
       <a href="#top" class="nav-logo">AutoDex</a>
       <div class="nav-links">
-        <a class="navlink" href="#loop" data-sec="loop">The loop</a>
+        <a class="navlink" href="#loop" data-sec="loop">The Loop</a>
         <a class="navlink" href="#explore" data-sec="explore">Demo</a>
         <a class="navlink" href="#dataset" data-sec="dataset">Dataset</a>
         <a class="navlink" href="#bibtex" data-sec="bibtex">BibTeX</a>
@@ -46,7 +46,7 @@
   <header class="hero" id="lead">
     <div class="wrap hero-titleblock">
       <h1 class="title">AutoDex</h1>
-      <p class="subtitle">Autonomous real-world data collection for dexterous&nbsp;grasping.</p>
+      <p class="subtitle">Autonomous Real-World Data Collection for Dexterous&nbsp;Grasping.</p>
       <p class="tagline">AutoDex closes the loop between simulation-generated grasp candidates and real-world validation: it executes multi-finger grasps, labels lift-and-hold success or failure, and actively resets objects to collect physically grounded dexterous-grasp data with <b>far less manual effort than teleoperation</b>.</p>
 
       <div class="authors">
@@ -100,13 +100,13 @@
   <!-- ================= THE LOOP ================= -->
   <section id="loop">
     <div class="wrap-wide">
-      <h2 class="sec-title">The cycle behind every grasp</h2>
+      <h2 class="sec-title">The Cycle Behind Every Grasp</h2>
       <p class="sec-sub">Every trial runs these four steps automatically &mdash; then the loop closes and starts the next grasp. Click a step.</p>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
-        <div class="step-tab" data-step="2"><span class="n">2</span> Plan &amp; grasp</div>
-        <div class="step-tab" data-step="3"><span class="n">3</span> Lift &amp; label</div>
+        <div class="step-tab" data-step="2"><span class="n">2</span> Plan &amp; Grasp</div>
+        <div class="step-tab" data-step="3"><span class="n">3</span> Lift &amp; Label</div>
         <div class="step-tab" data-step="4"><span class="n">4</span> Reset &nbsp;&#8635;</div>
       </div>
 
@@ -117,11 +117,11 @@
         </div>
         <div class="step-panel" data-step="2">
           <div class="frame"><video muted loop playsinline poster="static/posters/grasp_check.jpg"><source src="static/videos/grasp_check.mp4" type="video/mp4"></video></div>
-          <div><h3>2 &middot; Plan &amp; grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact during automated runs.</p></div>
+          <div><h3>2 &middot; Plan &amp; Grasp</h3><p>A candidate grasp is selected and a collision-free arm trajectory is planned to it. The hand closes on the object &mdash; with torque monitoring guarding every contact during automated runs.</p></div>
         </div>
         <div class="step-panel" data-step="3">
           <div class="frame"><video muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
-          <div><h3>3 &middot; Lift &amp; label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both the wins and the misses.</p></div>
+          <div><h3>3 &middot; Lift &amp; Label</h3><p>The robot lifts and holds. Lift-and-hold success or failure is measured automatically and written as a ground-truth label &mdash; the dataset records both the wins and the misses.</p></div>
         </div>
         <div class="step-panel" data-step="4">
           <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
@@ -134,7 +134,7 @@
   <!-- ================= INTERACTIVE SHOWCASE ================= -->
   <section class="soft" id="explore">
     <div class="wrap-wide">
-      <h2 class="sec-title">Pick an object, watch it run</h2>
+      <h2 class="sec-title">Pick an Object, Watch It Run</h2>
       <p class="sec-sub">AutoDex executing validated grasps on the real robot. Pick an object.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
@@ -148,7 +148,7 @@
   <!-- ================= DATASET / SCALE ================= -->
   <section id="dataset">
     <div class="wrap-wide">
-      <h2 class="sec-title">3,593 validated grasps</h2>
+      <h2 class="sec-title">3,593 Validated Grasps</h2>
       <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; across four scene types, with synchronized 20-view observations and robot-state logs.</p>
 
       <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
