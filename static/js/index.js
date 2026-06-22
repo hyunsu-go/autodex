@@ -16,11 +16,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---- Interactive showcase: pick object -> watch the grasp ---- */
   const OBJECTS = [
-    { name: 'Donut',        exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
     { name: 'Blue vase',    exec: 'static/videos/result_bluevase.mp4',          poster: 'static/posters/result_bluevase.jpg' },
     { name: 'Brush',        exec: 'static/videos/result_beige_brush.mp4',       poster: 'static/posters/result_beige_brush.jpg' },
     { name: 'Small bowl',   exec: 'static/videos/result_smallbowl.mp4',         poster: 'static/posters/result_smallbowl.jpg' },
     { name: 'Serving bowl', exec: 'static/videos/result_servingbowl_small.mp4', poster: 'static/posters/result_servingbowl_small.jpg' },
+    { name: 'Soap tray',    exec: 'static/videos/result_soap_tray.mp4',         poster: 'static/posters/result_soap_tray.jpg' },
+    { name: 'Donut',        exec: 'static/videos/result_donut.mp4',             poster: 'static/posters/result_donut.jpg' },
   ];
   const scVideo = document.getElementById('sc-video');
   const scObjs = document.getElementById('sc-objs');
