@@ -192,7 +192,7 @@ section { padding: 3.5rem 0; }
 .step-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
 .step-tab.active .n { color: var(--accent); }
 .step-panel { display:none; }
-.step-panel.active { display:grid; grid-template-columns:1.25fr 1fr; gap:2.4rem; align-items:center; }
+.step-panel.active { display:grid; grid-template-columns:1.6fr 1fr; gap:2.2rem; align-items:center; }
 .step-panel.active .frame { width:100%; border:none; }
 .step-panel .step-text { text-align:left; }
 .step-panel h3 { font-size:1.4rem; font-weight:700; color:var(--ink); margin:0 0 .7rem; letter-spacing:-.2px; }
