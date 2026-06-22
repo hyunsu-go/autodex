@@ -90,6 +90,11 @@
         <p>The system automates the collection loop: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
       </div>
     </div>
+
+    <div class="wrap-wide" style="margin-top:2.4rem;">
+      <div class="frame" style="background:#fff;"><img src="static/images/teaser.png" alt="AutoDex pipeline overview"></div>
+      <p class="caption"><b>The AutoDex pipeline.</b> A grasp candidate is validated by automatic real-world data collection &mdash; 6D pose estimation, grasp retrieval, planning, record &amp; label, and reset &mdash; building the AutoDex database, which is queried for in-the-wild execution via retrieval.</p>
+    </div>
   </section>
 
   <!-- ================= THE LOOP ================= -->
