@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623a">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623b">
 </head>
 <body>
 
@@ -33,40 +33,38 @@
   </nav>
 
   <!-- ================= HERO ================= -->
-  <!-- ============ FULL-SCREEN HERO VIDEO ============ -->
-  <section class="fullvideo" id="top">
+  <!-- ============ FULL-SCREEN HERO VIDEO with centered title/authors ============ -->
+  <header class="fullvideo" id="top">
     <video class="lazyplay" autoplay muted loop playsinline poster="static/images/loop_poster.jpg">
       <source src="static/videos/loop.mp4" type="video/mp4">
     </video>
-    <span class="hero-brand">AUTODEX</span>
-    <span class="live-badge"><span class="dot"></span> 6&times; playback</span>
-    <a href="#lead" class="scroll-hint" aria-label="Scroll down"><i class="fas fa-chevron-down"></i></a>
-  </section>
+    <div class="fv-scrim"></div>
 
-  <header class="hero" id="lead">
-    <div class="wrap hero-titleblock">
-      <h1 class="title">AutoDex</h1>
-      <p class="subtitle">Autonomous Real-World Data Collection for Dexterous&nbsp;Grasping.</p>
-      <p class="tagline">AutoDex closes the loop between simulation-generated grasp candidates and real-world validation: it executes multi-finger grasps, labels lift-and-hold success or failure, and actively resets objects to collect physically grounded dexterous-grasp data with <b>no human in the loop</b> and far less manual effort than teleoperation.</p>
+    <div class="fv-center">
+      <h1 class="fv-title">AutoDex</h1>
+      <p class="fv-papertitle">An Automated Real-World System for Dexterous Grasping Data Collection</p>
 
-      <div class="authors">
-        <span class="a"><a href="https://willi19.github.io/" target="_blank" rel="noopener">Mingi Choi</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://gunhee1113.github.io/" target="_blank" rel="noopener">Gunhee Kim</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://jlogkim.github.io/" target="_blank" rel="noopener">Jisoo Kim</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://taeksuu.github.io" target="_blank" rel="noopener">Taeksoo Kim</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://hahahataeyun.github.io/" target="_blank" rel="noopener">Taeyun Ha</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://jongbinlim.github.io" target="_blank" rel="noopener">Jongbin Lim</a><sup>1</sup>,</span>
-        <span class="a"><a href="https://jhugestar.github.io/" target="_blank" rel="noopener">Hanbyul Joo</a><sup>1,2</sup></span>
-        <div class="affil"><sup>1</sup>Seoul National University &nbsp;&middot;&nbsp; <sup>2</sup>RLWRLD</div>
+      <div class="fv-authors">
+        <a href="https://willi19.github.io/" target="_blank" rel="noopener">Mingi Choi</a><sup>1</sup>,
+        <a href="https://gunhee1113.github.io/" target="_blank" rel="noopener">Gunhee Kim</a><sup>1</sup>,
+        <a href="https://jlogkim.github.io/" target="_blank" rel="noopener">Jisoo Kim</a><sup>1</sup>,
+        <a href="https://taeksuu.github.io" target="_blank" rel="noopener">Taeksoo Kim</a><sup>1</sup>,
+        <a href="https://hahahataeyun.github.io/" target="_blank" rel="noopener">Taeyun Ha</a><sup>1</sup>,
+        <a href="https://jongbinlim.github.io" target="_blank" rel="noopener">Jongbin Lim</a><sup>1</sup>,
+        <a href="https://jhugestar.github.io/" target="_blank" rel="noopener">Hanbyul Joo</a><sup>1,2</sup>
+        <div class="fv-affil"><sup>1</sup>Seoul National University &nbsp;&middot;&nbsp; <sup>2</sup>RLWRLD</div>
       </div>
 
-      <div class="btns">
-        <a class="btn" href="static/AutoDex.pdf" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
-        <a class="btn ghost" href="#" target="_blank" rel="noopener"><i class="fas fa-file-lines"></i> arXiv</a>
-        <a class="btn ghost" href="https://github.com/willi19/autodex-code" target="_blank" rel="noopener"><i class="fab fa-github"></i> Code</a>
-        <a class="btn ghost" href="#dataset"><i class="fas fa-database"></i> Dataset</a>
+      <div class="fv-btns">
+        <a class="hbtn" href="static/AutoDex.pdf" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Paper</a>
+        <a class="hbtn" href="#" target="_blank" rel="noopener"><i class="fas fa-file-lines"></i> arXiv</a>
+        <a class="hbtn" href="https://github.com/willi19/autodex-code" target="_blank" rel="noopener"><i class="fab fa-github"></i> Code</a>
+        <a class="hbtn" href="#dataset"><i class="fas fa-database"></i> Dataset</a>
       </div>
     </div>
+
+    <span class="live-badge"><span class="dot"></span> 6&times; playback</span>
+    <a href="#abstract" class="scroll-hint" aria-label="Scroll down"><i class="fas fa-chevron-down"></i></a>
   </header>
 
   <!-- ================= STAT STRIP (dataset scale) ================= -->
@@ -177,6 +175,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623a"></script>
+  <script src="static/js/index.js?v=20260623b"></script>
 </body>
 </html>
