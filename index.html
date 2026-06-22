@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623w">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623x">
 </head>
 <body>
 
@@ -126,19 +126,19 @@
         </div>
         <div class="step-panel" data-step="2">
           <div class="frame"><video muted loop playsinline poster="static/posters/filter.jpg"><source src="static/videos/filter.mp4" type="video/mp4"></video></div>
-          <div class="step-text"><h3>2 &middot; Filter</h3><p>After perception, AutoDex filters the candidate grasps for the current trial. It considers only the candidates generated for the object&rsquo;s current stable tabletop pose, transforms them into the robot frame, and discards any without an arm inverse-kinematics solution. The remaining candidates form the feasible set for this trial.</p></div>
+          <div class="step-text"><h3>2 &middot; Filter</h3><p>AutoDex considers only the candidates generated for the object&rsquo;s current stable pose and filters them before execution. In the video, green grasps are reachable candidates, while yellow grasps are rejected because the arm has no valid inverse-kinematics solution. The remaining candidates form the feasible set for the trial.</p></div>
         </div>
         <div class="step-panel" data-step="3">
           <div class="frame"><video muted loop playsinline poster="static/posters/select.jpg"><source src="static/videos/select.mp4" type="video/mp4"></video></div>
-          <div class="step-text"><h3>3 &middot; Select</h3><p>From the feasible set, AutoDex selects the grasp that works in the largest number of remaining scenes &mdash; a grasp &ldquo;works&rdquo; in a scene if it stays feasible under that scene&rsquo;s obstacle constraints. When the real-world execution succeeds, those scenes are marked complete and removed from the remaining set, so a single successful grasp can be reused across many scene conditions &mdash; making each physical trial as useful as possible.</p></div>
+          <div class="step-text"><h3>3 &middot; Select</h3><p>AutoDex selects the feasible grasp that covers the most remaining scene conditions. If the grasp succeeds on the real robot, those covered conditions are marked complete, making each physical trial count for more than one scene.</p></div>
         </div>
         <div class="step-panel" data-step="4">
           <div class="frame"><video muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
-          <div class="step-text"><h3>4 &middot; Execute</h3><p>The robot moves to a pre-grasp configuration, closes the hand, lifts the object, and briefly holds it &mdash; a lift-and-hold motion that tests real-world grasp stability; the trial is halted if unexpected contact is detected. AutoDex records synchronized multi-view videos, video-aligned robot states, and the selected grasp; object tracking then recovers the object&rsquo;s trajectory and assigns a success or failure label.</p></div>
+          <div class="step-text"><h3>4 &middot; Execute</h3><p>The robot executes the selected grasp by closing the hand, lifting the object, and holding it. Safety monitoring stops the trial if unexpected contact is detected. AutoDex records the synchronized videos and robot states, tracks the object motion, and labels the trial as a success or failure.</p></div>
         </div>
         <div class="step-panel" data-step="5">
           <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
-          <div class="step-text"><h3>5 &middot; Reset &#8635;</h3><p>When a pose&rsquo;s feasible candidates run out while others remain for different poses, AutoDex reorients the object to a new stable pose. The challenge is that reset needs a grasp that works for both pickup and placement; AutoDex finds one by merging the pickup and placement constraints into a single collision scene. A grasp that is collision-free there can carry the object from its current pose (<b>left</b>) to the destination pose (<b>right</b>).</p></div>
+          <div class="step-text"><h3>5 &middot; Reset &#8635;</h3><p>When the current stable pose runs out of feasible candidates, AutoDex moves the object to another stable pose with remaining candidates. In the video, reset is planned by merging the pickup and placement constraints into one collision scene. A collision-free reset grasp can pick up the object, reorient it, and place it at the target pose, keeping the collection loop running without manual intervention.</p></div>
         </div>
       </div>
     </div>
@@ -191,6 +191,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623w"></script>
+  <script src="static/js/index.js?v=20260623x"></script>
 </body>
 </html>
