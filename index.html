@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623n">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623o">
 </head>
 <body>
 
@@ -109,7 +109,7 @@
   <section class="soft" id="loop">
     <div class="wrap-wide">
       <h2 class="sec-title">Grasp Validation Loop</h2>
-      <p class="sec-sub">Candidate grasps are precomputed in simulation. Per trial, AutoDex runs perceive &rarr; filter &rarr; select &rarr; execute on real hardware; when a pose&rsquo;s candidates run out, it resets the object to a new pose. No human in the loop. Click a step.</p>
+      <p class="sec-sub">Each trial turns a generated grasp candidate into a physical success-or-failure label: AutoDex localizes the object, selects and executes a feasible grasp, then resets the object for the next attempt. Click a step.</p>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
@@ -191,6 +191,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623n"></script>
+  <script src="static/js/index.js?v=20260623o"></script>
 </body>
 </html>
