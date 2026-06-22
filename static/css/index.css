@@ -81,9 +81,12 @@ a:hover { text-decoration: underline; }
 .fullvideo { position:relative; width:100%; height:100vh; height:100svh; min-height:420px; background:#000; overflow:hidden; }
 .fullvideo > video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
 .fullvideo .live-badge { top:18px; left:18px; z-index:2; }
+/* bottom scrim so the overlay caption stays legible */
+.fullvideo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:42%; z-index:1; pointer-events:none; background:linear-gradient(transparent, rgba(0,0,0,.62)); }
 .fv-caption {
-  position:absolute; left:0; right:0; bottom:74px; text-align:center; color:#fff; z-index:2;
-  font-size:1.12rem; font-weight:500; padding:0 1.5rem; text-shadow:0 1px 14px rgba(0,0,0,.55);
+  position:absolute; left:0; right:0; bottom:84px; text-align:center; color:#fff; z-index:2;
+  font-size:clamp(1.3rem, 2.7vw, 2.05rem); font-weight:700; line-height:1.3;
+  max-width:40ch; margin:0 auto; padding:0 1.5rem; letter-spacing:-.2px; text-shadow:0 2px 18px rgba(0,0,0,.5);
 }
 .scroll-hint {
   position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:2;
@@ -91,7 +94,7 @@ a:hover { text-decoration: underline; }
 }
 .scroll-hint:hover { opacity:1; text-decoration:none; }
 @keyframes bounce { 0%,100%{transform:translate(-50%,0);} 50%{transform:translate(-50%,9px);} }
-@media (max-width:640px){ .fv-caption{ font-size:.98rem; bottom:64px; } }
+@media (max-width:640px){ .fv-caption{ font-size:1.2rem; bottom:70px; } }
 
 /* ---------- Hero video + running badge ---------- */
 .hero-video { position:relative; }
