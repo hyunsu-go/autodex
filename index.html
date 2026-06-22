@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623x">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623y">
 </head>
 <body>
 
@@ -101,7 +101,7 @@
     <div class="wrap-wide">
       <h2 class="sec-title">Candidate Generation</h2>
       <p class="sec-sub">AutoDex starts with grasp candidates generated from an object mesh and a scene specification, such as a wall, shelf, or box. These constraints restrict the hand&rsquo;s approach directions and produce candidates that reflect different surrounding environments.</p>
-      <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/generation.jpg"><source src="static/videos/generation.mp4" type="video/mp4"></video></div>
+      <div class="frame"><video class="lazyplay" controls autoplay muted loop playsinline poster="static/posters/generation.jpg"><source src="static/videos/generation.mp4" type="video/mp4"></video></div>
     </div>
   </section>
 
@@ -121,23 +121,23 @@
 
       <div>
         <div class="step-panel active" data-step="1">
-          <div class="frame"><video muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video controls muted loop playsinline poster="static/posters/perception.jpg"><source src="static/videos/perception.mp4" type="video/mp4"></video></div>
           <div class="step-text"><h3>1 &middot; Perceive</h3><p>AutoDex starts each trial by estimating the object&rsquo;s current 6D pose from the multi-view camera rig. In the video, object masks are predicted across synchronized views, an initial pose is selected from per-view estimates, and silhouette refinement aligns the rendered object with the observed mask contours. The final pose is overlaid on the camera views and used to determine the object&rsquo;s current stable tabletop pose.</p></div>
         </div>
         <div class="step-panel" data-step="2">
-          <div class="frame"><video muted loop playsinline poster="static/posters/filter.jpg"><source src="static/videos/filter.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video controls muted loop playsinline poster="static/posters/filter.jpg"><source src="static/videos/filter.mp4" type="video/mp4"></video></div>
           <div class="step-text"><h3>2 &middot; Filter</h3><p>AutoDex considers only the candidates generated for the object&rsquo;s current stable pose and filters them before execution. In the video, green grasps are reachable candidates, while yellow grasps are rejected because the arm has no valid inverse-kinematics solution. The remaining candidates form the feasible set for the trial.</p></div>
         </div>
         <div class="step-panel" data-step="3">
-          <div class="frame"><video muted loop playsinline poster="static/posters/select.jpg"><source src="static/videos/select.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video controls muted loop playsinline poster="static/posters/select.jpg"><source src="static/videos/select.mp4" type="video/mp4"></video></div>
           <div class="step-text"><h3>3 &middot; Select</h3><p>AutoDex selects the feasible grasp that covers the most remaining scene conditions. If the grasp succeeds on the real robot, those covered conditions are marked complete, making each physical trial count for more than one scene.</p></div>
         </div>
         <div class="step-panel" data-step="4">
-          <div class="frame"><video muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video controls muted loop playsinline poster="static/posters/execute.jpg"><source src="static/videos/execute.mp4" type="video/mp4"></video></div>
           <div class="step-text"><h3>4 &middot; Execute</h3><p>The robot executes the selected grasp by closing the hand, lifting the object, and holding it. Safety monitoring stops the trial if unexpected contact is detected. AutoDex records the synchronized videos and robot states, tracks the object motion, and labels the trial as a success or failure.</p></div>
         </div>
         <div class="step-panel" data-step="5">
-          <div class="frame"><video muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
+          <div class="frame"><video controls muted loop playsinline poster="static/posters/reset.jpg"><source src="static/videos/reset.mp4" type="video/mp4"></video></div>
           <div class="step-text"><h3>5 &middot; Reset &#8635;</h3><p>When the current stable pose runs out of feasible candidates, AutoDex moves the object to another stable pose with remaining candidates. In the video, reset is planned by merging the pickup and placement constraints into one collision scene. A collision-free reset grasp can pick up the object, reorient it, and place it at the target pose, keeping the collection loop running without manual intervention.</p></div>
         </div>
       </div>
@@ -147,13 +147,13 @@
   <!-- ================= INTERACTIVE SHOWCASE ================= -->
   <section id="explore">
     <div class="wrap-wide">
-      <h2 class="sec-title">Pick an Object, Watch It Run</h2>
-      <p class="sec-sub">AutoDex executing validated grasps on the real robot, with no human in the loop. Pick an object.</p>
+      <h2 class="sec-title">AutoDex in Continuous Operation</h2>
+      <p class="sec-sub">Select an object to watch AutoDex run uninterrupted grasp-collection loops on the real robot at 15&times; speed, from candidate execution to labeling and reset.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
         <div class="frame sc-stage">
           <span class="sc-badge"><span class="dot"></span> 15&times; playback</span>
-          <video id="sc-video" class="lazyplay" muted loop playsinline></video>
+          <video id="sc-video" class="lazyplay" controls muted loop playsinline></video>
         </div>
       </div>
     </div>
@@ -162,10 +162,10 @@
   <!-- ================= DATASET / SCALE ================= -->
   <section class="soft" id="dataset">
     <div class="wrap-wide">
-      <h2 class="sec-title">3,593 Grasp Trials</h2>
-      <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; across three scene types. Each trial stores the grasp pose (6-DoF wrist&nbsp;+ finger joint values), the synchronized robot trajectory, the 20-view RGB video, and the lift-and-hold success/failure label.</p>
+      <h2 class="sec-title">3,593 Physically Labeled Grasp Trials</h2>
+      <p class="sec-sub">Through autonomous real-robot execution, AutoDex collects dexterous-grasp trials across 100 objects, two hands, and multiple scene conditions. Each trial stores the executed grasp configuration, synchronized robot trajectory, 20-view RGB video, tracked object motion, and lift-and-hold success-or-failure label.</p>
 
-      <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
+      <div class="frame"><video class="lazyplay" controls autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
     </div>
   </section>
 
@@ -191,6 +191,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623x"></script>
+  <script src="static/js/index.js?v=20260623y"></script>
 </body>
 </html>
