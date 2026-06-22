@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623c">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623d">
 </head>
 <body>
 
@@ -71,24 +71,27 @@
   <section class="soft" id="abstract">
     <div class="wrap">
       <h2 class="sec-title">Abstract</h2>
+    </div>
+
+    <div class="wrap-wide" style="margin-top:1.6rem;">
+      <div class="frame" style="background:#fff;"><img src="static/images/teaser.png" alt="AutoDex pipeline overview"></div>
+      <p class="caption"><b>The AutoDex pipeline.</b> Each grasp candidate is validated by automatic real-world data collection, building the AutoDex database &mdash; which is then queried for in-the-wild execution via retrieval.</p>
+    </div>
+
+    <div class="wrap" style="margin-top:2.6rem;">
       <div class="prose">
         <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
         <p>The system closes the full loop without human intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
       </div>
     </div>
 
-    <div class="wrap-wide" style="margin-top:2rem;">
+    <div class="wrap-wide" style="margin-top:2.6rem;">
       <div class="stat-strip">
         <div class="stat"><div class="num">3,593</div><div class="lbl">grasp trials</div></div>
         <div class="stat"><div class="num">100</div><div class="lbl">diverse objects</div></div>
         <div class="stat"><div class="num">4.8&times;</div><div class="lbl">faster than teleoperation</div></div>
         <div class="stat"><div class="num">2</div><div class="lbl">robot hands (Allegro, Inspire)</div></div>
       </div>
-    </div>
-
-    <div class="wrap-wide" style="margin-top:2.4rem;">
-      <div class="frame" style="background:#fff;"><img src="static/images/teaser.png" alt="AutoDex pipeline overview"></div>
-      <p class="caption"><b>The AutoDex pipeline.</b> Each grasp candidate is validated by automatic real-world data collection, building the AutoDex database &mdash; which is then queried for in-the-wild execution via retrieval.</p>
     </div>
   </section>
 
@@ -172,6 +175,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623c"></script>
+  <script src="static/js/index.js?v=20260623d"></script>
 </body>
 </html>
