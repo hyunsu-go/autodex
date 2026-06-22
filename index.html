@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260622b">
+  <link rel="stylesheet" href="static/css/index.css?v=20260622c">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
       <source src="static/videos/loop.mp4" type="video/mp4">
     </video>
     <span class="live-badge"><span class="dot"></span> Autonomous execution &middot; 6&times; speed</span>
-    <div class="fv-caption">AutoDex executes and validates dexterous grasps on real hardware &mdash; far faster than teleoperation.</div>
+    <div class="fv-caption">AutoDex executes and validates dexterous grasps on real hardware, with no human in the loop &mdash; far faster than teleoperation.</div>
     <a href="#lead" class="scroll-hint" aria-label="Scroll down"><i class="fas fa-chevron-down"></i></a>
   </section>
 
@@ -47,7 +47,7 @@
     <div class="wrap hero-titleblock">
       <h1 class="title">AutoDex</h1>
       <p class="subtitle">Autonomous Real-World Data Collection for Dexterous&nbsp;Grasping.</p>
-      <p class="tagline">AutoDex closes the loop between simulation-generated grasp candidates and real-world validation: it executes multi-finger grasps, labels lift-and-hold success or failure, and actively resets objects to collect physically grounded dexterous-grasp data with <b>far less manual effort than teleoperation</b>.</p>
+      <p class="tagline">AutoDex closes the loop between simulation-generated grasp candidates and real-world validation: it executes multi-finger grasps, labels lift-and-hold success or failure, and actively resets objects to collect physically grounded dexterous-grasp data with <b>no human in the loop</b> and far less manual effort than teleoperation.</p>
 
       <div class="authors">
         <span class="a"><a href="https://willi19.github.io/" target="_blank" rel="noopener">Mingi Choi</a><sup>1</sup>,</span>
@@ -87,7 +87,7 @@
       <h2 class="sec-title">Abstract</h2>
       <div class="prose">
         <p>Real dexterous-grasp data is expensive: simulation is scalable but unreliable for contact, while human teleoperation is physically valid but slow and biased by operator choices. AutoDex is an <b>automated real-world data-collection system</b> that proposes geometrically feasible grasps in simulation and validates each one by physically executing it with a multi-fingered hand.</p>
-        <p>The system automates the collection loop: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
+        <p>The system closes the full loop without human intervention: it accepts candidates from a generator, localizes the object with dense 20-camera tracking, plans and executes collision-monitored motions, labels lift-and-hold success or failure, and <b>actively resets the object for the next trial</b> &mdash; then repeats. Using AutoDex we collect <b>3,593</b> real-world-validated grasps (successes <em>and</em> failures) across the Allegro and Inspire hands on 100 objects, <b>4.8&times;</b> faster than teleoperation; real-world validation raises downstream grasp success from <b>34%</b> to <b>76%</b>.</p>
       </div>
     </div>
 
@@ -101,7 +101,7 @@
   <section id="loop">
     <div class="wrap-wide">
       <h2 class="sec-title">The Cycle Behind Every Grasp</h2>
-      <p class="sec-sub">Every trial runs these four steps automatically &mdash; then the loop closes and starts the next grasp. Click a step.</p>
+      <p class="sec-sub">Every trial runs these four steps with no human in the loop &mdash; then the loop closes and starts the next grasp. Click a step.</p>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
@@ -135,7 +135,7 @@
   <section class="soft" id="explore">
     <div class="wrap-wide">
       <h2 class="sec-title">Pick an Object, Watch It Run</h2>
-      <p class="sec-sub">AutoDex executing validated grasps on the real robot. Pick an object.</p>
+      <p class="sec-sub">AutoDex executing validated grasps on the real robot, with no human in the loop. Pick an object.</p>
       <div class="showcase" id="showcase">
         <div class="sc-objs" id="sc-objs"></div>
         <div class="frame sc-stage">
@@ -149,7 +149,7 @@
   <section id="dataset">
     <div class="wrap-wide">
       <h2 class="sec-title">3,593 Validated Grasps</h2>
-      <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; across four scene types, with synchronized 20-view observations and robot-state logs.</p>
+      <p class="sec-sub">AutoDex builds a real-world-validated dexterous-grasp dataset &mdash; successes and failures &mdash; across three scene types (tabletop, wall, cluttered), with synchronized 20-view observations and robot-state logs.</p>
 
       <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/images/wall_poster.jpg"><source src="static/videos/dataset_wall.mp4" type="video/mp4"></video></div>
     </div>
@@ -177,6 +177,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260622b"></script>
+  <script src="static/js/index.js?v=20260622c"></script>
 </body>
 </html>
