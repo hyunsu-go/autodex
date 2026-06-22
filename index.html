@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="static/css/index.css?v=20260623u">
+  <link rel="stylesheet" href="static/css/index.css?v=20260623v">
 </head>
 <body>
 
@@ -100,7 +100,7 @@
   <section id="generate">
     <div class="wrap-wide">
       <h2 class="sec-title">Candidate Generation</h2>
-      <p class="sec-sub">AutoDex starts with grasp candidates generated from an object mesh and a scene specification, such as a wall, shelf, or box. These constraints restrict the hand&rsquo;s approach directions and produce grasps for different surrounding environments. The candidates are geometrically feasible, but their real contact stability is determined only after AutoDex executes them on hardware.</p>
+      <p class="sec-sub">AutoDex starts with grasp candidates generated from an object mesh and a scene specification, such as a wall, shelf, or box. These constraints restrict the hand&rsquo;s approach directions and produce candidates that reflect different surrounding environments.</p>
       <div class="frame"><video class="lazyplay" autoplay muted loop playsinline poster="static/posters/generation.jpg"><source src="static/videos/generation.mp4" type="video/mp4"></video></div>
     </div>
   </section>
@@ -109,7 +109,7 @@
   <section class="soft" id="loop">
     <div class="wrap-wide">
       <h2 class="sec-title">Grasp Validation Loop</h2>
-      <p class="sec-sub">AutoDex tests generated grasp candidates on the real robot: it localizes the object, selects an executable candidate, executes it, records the physical outcome, and resets the object when a new pose is needed. Click a step.</p>
+      <p class="sec-sub">AutoDex tests generated grasp candidates on the real robot. Each trial localizes the object, selects a feasible candidate, executes the grasp, and records the physical outcome. When the current pose runs out of candidates, AutoDex resets the object and continues. Click a step.</p>
 
       <div class="stepper">
         <div class="step-tab active" data-step="1"><span class="n">1</span> Perceive</div>
@@ -191,6 +191,6 @@
     </div>
   </footer>
 
-  <script src="static/js/index.js?v=20260623u"></script>
+  <script src="static/js/index.js?v=20260623v"></script>
 </body>
 </html>
