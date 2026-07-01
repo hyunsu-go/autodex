@@ -11,11 +11,11 @@ import importlib.util
 import os
 import sys
 from pathlib import Path
-from typing import Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BATCH_SCRIPT = REPO_ROOT / "src" / "process" / "batch_object_overlay.py"
+BF16_SITECUSTOMIZE = REPO_ROOT / "scripts" / "gotrack_bf16_sitecustomize"
 
 
 def _first_existing(env_keys: tuple[str, ...], candidates: tuple[Path, ...]) -> Path:
@@ -55,15 +55,8 @@ def _nccl_dirs_for_python(python_bin: Path) -> list[Path]:
     ]
 
 
-def _inject_gotrack_precision(cmd: Sequence[object], precision: str) -> list[object]:
-    patched = list(cmd)
-    if not precision or precision == "fp32":
-        return patched
-    if "--forward-precision" in patched:
-        return patched
-    if any(str(part).endswith("run_multiview_gotrack_anchor_online.py") for part in patched):
-        patched.extend(["--forward-precision", precision])
-    return patched
+def _is_gotrack_tracking_command(cmd) -> bool:
+    return any(str(part).endswith("run_multiview_gotrack_anchor_online.py") for part in list(cmd))
 
 
 class _BatchSubprocessProxy:
@@ -75,10 +68,19 @@ class _BatchSubprocessProxy:
         return getattr(self._module, name)
 
     def Popen(self, cmd, *args, **kwargs):
-        patched = _inject_gotrack_precision(cmd, self._gotrack_forward_precision)
-        if patched != list(cmd):
-            print(f"[env] injected --forward-precision {self._gotrack_forward_precision}", flush=True)
-        return self._module.Popen(patched, *args, **kwargs)
+        if self._gotrack_forward_precision == "bf16" and _is_gotrack_tracking_command(cmd):
+            env = dict(os.environ)
+            env.update(kwargs.get("env") or {})
+            existing = env.get("PYTHONPATH", "")
+            paths = [str(BF16_SITECUSTOMIZE)]
+            if existing:
+                paths.append(existing)
+            env["PYTHONPATH"] = os.pathsep.join(paths)
+            env["AUTODEX_GOTRACK_BF16_AUTOCAST"] = "1"
+            env.setdefault("AUTODEX_GOTRACK_BF16_REQUIRED", "1")
+            kwargs["env"] = env
+            print("[env] enabled GoTrack BF16 autocast shim", flush=True)
+        return self._module.Popen(cmd, *args, **kwargs)
 
 
 def main() -> int:
