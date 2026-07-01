@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import mimetypes
+import subprocess
 import sys
 import time
 import webbrowser
@@ -18,6 +20,69 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from autodex.tracking.episode_queue import DEFAULT_PCS, EpisodeScheduleStore, summarize_schedule  # noqa: E402
+
+
+STAGE_DEFINITIONS = [
+    {
+        "key": "pending",
+        "label": "Pending",
+        "description": "Episode is in the queue and no worker has claimed it yet.",
+        "output": "task json",
+    },
+    {
+        "key": "claimed",
+        "label": "Claimed",
+        "description": "A capture PC created the episode lock and is preparing the batch command.",
+        "output": "claim lock",
+    },
+    {
+        "key": "gotrack_or_overlay",
+        "label": "Starting",
+        "description": "The worker process is running; first stage-specific progress has not appeared yet.",
+        "output": "worker log",
+    },
+    {
+        "key": "gotrack",
+        "label": "GoTrack",
+        "description": "Multi-view object tracking over all camera videos for one episode.",
+        "output": "world_pose_records.json",
+    },
+    {
+        "key": "overlay",
+        "label": "Overlay",
+        "description": "Per-camera mesh overlay videos are rendered from the tracked poses.",
+        "output": "overlay_*.mp4",
+    },
+    {
+        "key": "complete",
+        "label": "Complete",
+        "description": "Required outputs already exist or were produced successfully; the task is not rerun.",
+        "output": "done/skipped_done",
+    },
+    {
+        "key": "failed",
+        "label": "Failed",
+        "description": "The command failed or required outputs were missing after completion.",
+        "output": "reason + log",
+    },
+    {
+        "key": "dry_run",
+        "label": "Dry Run",
+        "description": "The worker claimed the episode without running tracking or overlay.",
+        "output": "dry_run_done",
+    },
+]
+
+
+def _stage_summary(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    phase_counts: Dict[str, int] = {}
+    status_counts: Dict[str, int] = {}
+    for task in tasks:
+        phase = str(task.get("phase") or task.get("status") or "unknown")
+        status = str(task.get("status") or "unknown")
+        phase_counts[phase] = phase_counts.get(phase, 0) + 1
+        status_counts[status] = status_counts.get(status, 0) + 1
+    return {"phase_counts": phase_counts, "status_counts": status_counts}
 
 
 def _load_events(path: Path, limit: int = 40) -> List[Dict[str, Any]]:
@@ -37,6 +102,8 @@ def collect(schedule_dir: Path) -> Dict[str, Any]:
     data = summarize_schedule(store)
     data["events"] = _load_events(store.events_path)
     data["expected_pcs"] = list(DEFAULT_PCS)
+    data["stage_definitions"] = STAGE_DEFINITIONS
+    data["stage_summary"] = _stage_summary(data.get("tasks", []))
     return data
 
 
@@ -54,6 +121,39 @@ def allowed_overlay_paths(schedule_dir: Path) -> Dict[str, Path]:
             if path.name.startswith("overlay_") and path.suffix.lower() == ".mp4" and path.is_file():
                 allowed[str(path)] = path
     return allowed
+
+
+def _thumbnail_path(schedule_dir: Path, video: Path) -> Path:
+    key = hashlib.sha256(str(video).encode("utf-8")).hexdigest()[:24]
+    return schedule_dir / ".overlay_thumbs" / f"{key}.jpg"
+
+
+def ensure_overlay_thumbnail(schedule_dir: Path, video: Path) -> Path:
+    thumb = _thumbnail_path(schedule_dir, video)
+    if thumb.exists() and thumb.stat().st_mtime >= video.stat().st_mtime:
+        return thumb
+    thumb.parent.mkdir(parents=True, exist_ok=True)
+    tmp = thumb.with_suffix(".jpg.tmp")
+    if tmp.exists():
+        tmp.unlink()
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-ss", "1",
+        "-i", str(video),
+        "-frames:v", "1",
+        "-vf", "scale=320:-1",
+        "-q:v", "5",
+        "-f", "image2",
+        str(tmp),
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    if result.returncode != 0 or not tmp.exists():
+        raise RuntimeError(result.stderr.strip() or "ffmpeg thumbnail generation failed")
+    tmp.replace(thumb)
+    return thumb
 
 
 HTML_PAGE = r"""<!doctype html>
@@ -162,6 +262,68 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
   font: inherit;
 }
 .overlay-button:hover { text-decoration: underline; }
+.stage-grid { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 10px; }
+.stage-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  min-width: 0;
+}
+.stage-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.stage-name { font-weight: 700; }
+.stage-count { font: 700 18px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.stage-desc { margin-top: 7px; color: #c9d1d9; min-height: 38px; }
+.stage-output { margin-top: 7px; color: var(--muted); overflow-wrap: anywhere; }
+.stage-card.active { border-color: #506172; background: #20262a; }
+.overlay-carousel {
+  display: grid;
+  grid-template-columns: 28px minmax(128px, 168px) 28px;
+  align-items: center;
+  gap: 6px;
+  width: 236px;
+}
+.overlay-step,
+.viewer-nav {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #30363d;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 6px;
+  height: 32px;
+  font: 700 14px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.overlay-step:disabled,
+.viewer-nav:disabled { color: var(--gray); cursor: default; opacity: .55; }
+.overlay-thumb-button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0d1117;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  min-width: 0;
+}
+.overlay-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #000;
+}
+.overlay-caption {
+  display: block;
+  padding: 4px 6px;
+  color: var(--muted);
+  font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .risk-title { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
 .risk-value { margin-top: 6px; font-size: 18px; font-weight: 700; }
 .risk-list { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
@@ -205,6 +367,14 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
   border-bottom: 1px solid var(--line);
   background: var(--panel2);
 }
+.viewer-body {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #0d1117;
+}
 .viewer-close {
   flex: none;
   width: 30px;
@@ -217,19 +387,24 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
   font: inherit;
 }
 .viewer video { width: 100%; max-height: 74vh; display: block; background: #000; }
+.viewer-nav { height: 54px; }
 .viewer-meta { padding: 8px 12px 10px; color: var(--muted); border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 @media (max-width: 1200px) {
   .overview-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
   .risk-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .stage-grid { grid-template-columns: repeat(2, minmax(210px, 1fr)); }
 }
 @media (max-width: 760px) {
   header { align-items: flex-start; flex-direction: column; }
   .overview-grid, .risk-grid { grid-template-columns: 1fr; }
+  .stage-grid { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; }
   table { font-size: 12px; }
   th, td { padding: 7px 8px; }
   .event { grid-template-columns: 74px 1fr; }
   .event .detail { grid-column: 1 / -1; }
+  .overlay-carousel { width: 210px; grid-template-columns: 26px minmax(120px, 158px) 26px; }
+  .viewer-body { grid-template-columns: 34px minmax(0, 1fr) 34px; }
 }
 </style>
 </head>
@@ -256,6 +431,15 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
     <div class="panel"><div class="metric-label">Throughput</div><div class="metric-value" id="throughput">-</div><div class="metric-small" id="throughputDetail">episodes/hour</div></div>
     <div class="panel"><div class="metric-label">Overlay Videos</div><div class="metric-value" id="overlayVideos">-</div><div class="metric-small" id="overlayDetail">-</div></div>
   </div>
+
+  <div class="section-title">
+    <div>
+      <h2>Stage Flow</h2>
+      <div class="sub">episode lifecycle and current distribution</div>
+    </div>
+    <span class="sub" id="stageMeta">stages</span>
+  </div>
+  <div class="stage-grid" id="stageFlow"></div>
 
   <div class="section-title">
     <div>
@@ -309,7 +493,11 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
       </div>
       <button class="viewer-close" type="button" id="overlayClose" aria-label="Close overlay video">x</button>
     </div>
-    <video id="overlayVideo" controls playsinline></video>
+    <div class="viewer-body">
+      <button class="viewer-nav" type="button" id="overlayPrev" aria-label="Previous overlay video">&lt;</button>
+      <video id="overlayVideo" controls playsinline></video>
+      <button class="viewer-nav" type="button" id="overlayNext" aria-label="Next overlay video">&gt;</button>
+    </div>
     <div class="viewer-meta mono" id="overlayMeta">-</div>
   </div>
 </div>
@@ -321,6 +509,10 @@ const statusClass = s => safe(s).replace(/[^a-zA-Z0-9_]/g, '_');
 const doneStatuses = new Set(['done', 'skipped_done', 'dry_run_done']);
 const activeStatuses = new Set(['running', 'claimed']);
 const failedStatuses = new Set(['failed']);
+let lastData = null;
+let overlayGroups = {};
+let overlayIndexes = {};
+let activeOverlayGroup = null;
 const fmtTime = ts => ts ? new Date(Number(ts) * 1000).toLocaleTimeString() : '-';
 const asNumber = value => {
   if (value === undefined || value === null || value === '') return null;
@@ -353,13 +545,24 @@ function statusBadge(status) {
 function overlayCell(task) {
   const files = (task.overlay_files || []).filter(Boolean);
   if (!files.length) return '<span class="muted">-</span>';
-  const links = files.slice(0, 5).map(path => {
-    const name = path.split('/').pop() || 'overlay.mp4';
-    const serial = name.replace(/^overlay_/, '').replace(/\.mp4$/i, '');
-    return `<button type="button" class="overlay-button mono" data-overlay-path="${esc(path)}" data-overlay-label="${esc(serial)}" title="${esc(path)}">${esc(serial)}</button>`;
-  }).join('');
-  const more = files.length > 5 ? `<span class="muted">+${files.length - 5}</span>` : '';
-  return `<div class="overlay-links">${links}${more}</div>`;
+  const group = safe(task.task_id || `${safe(task.obj)}__${safe(task.episode)}`);
+  overlayGroups[group] = files;
+  const rawIndex = Number.isInteger(overlayIndexes[group]) ? overlayIndexes[group] : 0;
+  const index = clamp(rawIndex, 0, files.length - 1);
+  overlayIndexes[group] = index;
+  const path = files[index];
+  const name = path.split('/').pop() || 'overlay.mp4';
+  const serial = name.replace(/^overlay_/, '').replace(/\.mp4$/i, '');
+  const disabled = files.length < 2 ? ' disabled' : '';
+  const thumb = '/overlay-thumb?path=' + encodeURIComponent(path);
+  return `<div class="overlay-carousel">
+    <button type="button" class="overlay-step" data-overlay-group="${esc(group)}" data-overlay-delta="-1" aria-label="Previous overlay video"${disabled}>&lt;</button>
+    <button type="button" class="overlay-thumb-button" data-overlay-open="1" data-overlay-group="${esc(group)}" title="${esc(path)}">
+      <img class="overlay-thumb" src="${esc(thumb)}" loading="lazy" alt="overlay ${esc(serial)}">
+      <span class="overlay-caption">${esc(index + 1)}/${esc(files.length)} ${esc(serial)}</span>
+    </button>
+    <button type="button" class="overlay-step" data-overlay-group="${esc(group)}" data-overlay-delta="1" aria-label="Next overlay video"${disabled}>&gt;</button>
+  </div>`;
 }
 
 function progressRatio(task) {
@@ -500,7 +703,27 @@ function renderRisks(tasks, workers, stats, manifest, now) {
   $('riskPanels').innerHTML = panels.join('');
 }
 
+function renderStageFlow(data, tasks) {
+  const defs = data.stage_definitions || [];
+  const phaseCounts = (data.stage_summary && data.stage_summary.phase_counts) || {};
+  const statusCounts = (data.stage_summary && data.stage_summary.status_counts) || {};
+  const activePhase = new Set(tasks.filter(t => activeStatuses.has(String(t.status || ''))).map(t => String(t.phase || '')));
+  $('stageMeta').textContent = `mode ${safe((data.manifest || {}).stages || 'both')} · skipped ${statusCounts.skipped_done || 0}`;
+  $('stageFlow').innerHTML = defs.map(def => {
+    const key = String(def.key || '');
+    const count = phaseCounts[key] || 0;
+    const active = count > 0 || activePhase.has(key) ? ' active' : '';
+    return `<div class="stage-card${active}">
+      <div class="stage-head"><span class="stage-name">${esc(def.label || key)}</span><span class="stage-count">${esc(count)}</span></div>
+      <div class="stage-desc">${esc(def.description || '')}</div>
+      <div class="stage-output mono">${esc(def.output || '')}</div>
+    </div>`;
+  }).join('');
+}
+
 function render(data) {
+  lastData = data;
+  overlayGroups = {};
   const manifest = data.manifest || {};
   const counts = data.counts || {};
   const now = asNumber(data.now) || Date.now() / 1000;
@@ -537,6 +760,8 @@ function render(data) {
   $('throughputDetail').textContent = stats.globalAvg ? `avg ${fmtDuration(stats.globalAvg)} / episode` : 'waiting for first completion';
   $('overlayVideos').textContent = String(overlayFiles);
   $('overlayDetail').textContent = `${overlayEpisodes} episodes with playback`;
+
+  renderStageFlow(data, tasks);
 
   $('workerMeta').textContent = `${workers.length} PCs · current-task ETA`;
   $('workerRows').innerHTML = workers.length ? workers.map(w => {
@@ -600,10 +825,25 @@ function render(data) {
   }).join('') : '<div class="event"><div class="muted">-</div><div>no events</div><div></div></div>';
 }
 
-function openOverlayVideo(path, label) {
-  $('overlayViewerTitle').textContent = label ? 'Overlay ' + label : 'Overlay Playback';
+function serialFromPath(path) {
+  const name = (path || '').split('/').pop() || 'overlay.mp4';
+  return name.replace(/^overlay_/, '').replace(/\.mp4$/i, '');
+}
+
+function openOverlayVideo(group, index) {
+  const files = overlayGroups[group] || [];
+  if (!files.length) return;
+  const n = files.length;
+  const nextIndex = ((Number(index) || 0) % n + n) % n;
+  const path = files[nextIndex];
+  const serial = serialFromPath(path);
+  activeOverlayGroup = group;
+  overlayIndexes[group] = nextIndex;
+  $('overlayViewerTitle').textContent = `Overlay ${nextIndex + 1}/${n} ${serial}`;
   $('overlayViewerSub').textContent = path || '-';
   $('overlayMeta').textContent = path || '-';
+  $('overlayPrev').disabled = n < 2;
+  $('overlayNext').disabled = n < 2;
   const video = $('overlayVideo');
   video.pause();
   video.src = '/overlay?path=' + encodeURIComponent(path);
@@ -614,6 +854,24 @@ function openOverlayVideo(path, label) {
   if (play && play.catch) play.catch(() => {});
 }
 
+function stepOverlayGroup(group, delta, openViewer) {
+  const files = overlayGroups[group] || [];
+  if (!files.length) return;
+  const current = Number.isInteger(overlayIndexes[group]) ? overlayIndexes[group] : 0;
+  const next = ((current + Number(delta || 0)) % files.length + files.length) % files.length;
+  overlayIndexes[group] = next;
+  if (openViewer) {
+    openOverlayVideo(group, next);
+  } else if (lastData) {
+    render(lastData);
+  }
+}
+
+function stepActiveOverlay(delta) {
+  if (!activeOverlayGroup) return;
+  stepOverlayGroup(activeOverlayGroup, delta, true);
+}
+
 function closeOverlayVideo() {
   const video = $('overlayVideo');
   video.pause();
@@ -621,6 +879,7 @@ function closeOverlayVideo() {
   video.load();
   $('overlayViewer').classList.remove('open');
   $('overlayViewer').setAttribute('aria-hidden', 'true');
+  activeOverlayGroup = null;
 }
 
 async function tick() {
@@ -634,10 +893,28 @@ async function tick() {
 
 document.addEventListener('click', ev => {
   const target = ev.target instanceof Element ? ev.target : null;
-  const btn = target ? target.closest('[data-overlay-path]') : null;
-  if (btn) {
+  const step = target ? target.closest('[data-overlay-delta]') : null;
+  if (step) {
     ev.preventDefault();
-    openOverlayVideo(btn.dataset.overlayPath, btn.dataset.overlayLabel);
+    stepOverlayGroup(step.dataset.overlayGroup, Number(step.dataset.overlayDelta), false);
+    return;
+  }
+  const open = target ? target.closest('[data-overlay-open]') : null;
+  if (open) {
+    ev.preventDefault();
+    const group = open.dataset.overlayGroup;
+    const index = Number.isInteger(overlayIndexes[group]) ? overlayIndexes[group] : 0;
+    openOverlayVideo(group, index);
+    return;
+  }
+  if (target === $('overlayPrev')) {
+    ev.preventDefault();
+    stepActiveOverlay(-1);
+    return;
+  }
+  if (target === $('overlayNext')) {
+    ev.preventDefault();
+    stepActiveOverlay(1);
     return;
   }
   if (target === $('overlayViewer') || target === $('overlayClose')) closeOverlayVideo();
@@ -645,6 +922,8 @@ document.addEventListener('click', ev => {
 
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape' && $('overlayViewer').classList.contains('open')) closeOverlayVideo();
+  if (ev.key === 'ArrowLeft' && $('overlayViewer').classList.contains('open')) stepActiveOverlay(-1);
+  if (ev.key === 'ArrowRight' && $('overlayViewer').classList.contains('open')) stepActiveOverlay(1);
 });
 
 tick();
@@ -670,6 +949,9 @@ def make_handler(schedule_dir: Path):
                 return
             if parsed.path == "/overlay":
                 self._serve_overlay(parsed)
+                return
+            if parsed.path == "/overlay-thumb":
+                self._serve_overlay_thumb(parsed)
                 return
             if parsed.path not in ("/", "/index.html"):
                 self.send_error(404)
@@ -741,6 +1023,36 @@ def make_handler(schedule_dir: Path):
                         break
                     self.wfile.write(chunk)
                     remaining -= len(chunk)
+
+        def _serve_overlay_thumb(self, parsed) -> None:
+            target = parse_qs(parsed.query).get("path", [""])[0]
+            if not target:
+                self.send_error(400, "missing path")
+                return
+            try:
+                requested = Path(target).expanduser().resolve()
+            except OSError:
+                self.send_error(400, "invalid path")
+                return
+            video = allowed_overlay_paths(schedule_dir).get(str(requested))
+            if video is None:
+                self.send_error(403, "overlay file is not in this schedule")
+                return
+            if not video.is_file():
+                self.send_error(404, "overlay video not found")
+                return
+            try:
+                thumb = ensure_overlay_thumbnail(schedule_dir, video)
+            except Exception as exc:
+                self.send_error(500, f"thumbnail generation failed: {exc}")
+                return
+            body = thumb.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def log_message(self, *_):
             pass
