@@ -37,6 +37,11 @@ def safe_task_id(hand: str, obj: str, episode: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", raw)
 
 
+def safe_task_id_from_parts(parts: Iterable[str]) -> str:
+    raw = "__".join(str(p) for p in parts)
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", raw)
+
+
 def load_json(path: Path, default: Any) -> Any:
     try:
         if not path.exists():
@@ -77,11 +82,57 @@ def discover_episodes(
     hand: str,
     objects: Optional[Iterable[str]] = None,
     episodes: Optional[Iterable[str]] = None,
+    recursive: bool = False,
 ) -> List[Dict[str, Any]]:
     """Discover saved video episodes under ``<root>/<hand>/<obj>/<episode>``."""
     root = Path(experiment_root).expanduser()
-    hand_dir = root / hand
+    object_filter = set(objects or [])
     episode_filter = set(episodes or [])
+    if recursive or hand in {"all", "*"}:
+        tasks: List[Dict[str, Any]] = []
+        hand_names = {"allegro", "inspire"}
+        for videos_dir in sorted(root.rglob("videos")):
+            ep = videos_dir.parent
+            if not ep.is_dir():
+                continue
+            rel_parts = ep.relative_to(root).parts
+            if len(rel_parts) < 3:
+                continue
+            episode = ep.name
+            if episode_filter and episode not in episode_filter:
+                continue
+            hand_index = None
+            for idx in range(len(rel_parts) - 2):
+                if rel_parts[idx] in hand_names:
+                    hand_index = idx
+                    break
+            if hand_index is None or hand_index + 2 >= len(rel_parts):
+                continue
+            task_hand = rel_parts[hand_index]
+            obj = rel_parts[hand_index + 1]
+            if object_filter and obj not in object_filter:
+                continue
+            pose_world = ep / "pose_world.npy"
+            cam_param = ep / "cam_param" / "intrinsics.json"
+            if not pose_world.exists() or not cam_param.exists():
+                continue
+            serials = sorted(p.stem for p in videos_dir.glob("*.avi"))
+            if not serials:
+                continue
+            tasks.append({
+                "task_id": safe_task_id_from_parts(rel_parts),
+                "hand": task_hand,
+                "obj": obj,
+                "episode": episode,
+                "episode_dir": str(ep),
+                "videos_dir": str(videos_dir),
+                "serials": serials,
+                "experiment_rel": str(Path(*rel_parts)),
+                "overlay_rel": str(Path(*rel_parts)),
+            })
+        return tasks
+
+    hand_dir = root / hand
     object_names = list(objects or [])
     if not object_names and hand_dir.is_dir():
         object_names = sorted(p.name for p in hand_dir.iterdir() if p.is_dir())
@@ -113,6 +164,8 @@ def discover_episodes(
                 "episode_dir": str(ep),
                 "videos_dir": str(videos_dir),
                 "serials": serials,
+                "experiment_rel": str(Path(hand) / obj / ep.name),
+                "overlay_rel": str(Path(hand) / obj / ep.name),
             })
     return tasks
 
@@ -198,6 +251,8 @@ class EpisodeScheduleStore:
         )
 
     def overlay_dir_for(self, task: Dict[str, Any]) -> Path:
+        if task.get("overlay_rel"):
+            return self.overlay_root / str(task["overlay_rel"])
         return self.overlay_root / str(task["hand"]) / str(task["obj"]) / str(task["episode"])
 
     def task_path(self, task_id: str) -> Path:
@@ -333,6 +388,9 @@ def build_episode_command(
     hand: str,
     obj: str,
     episode: str,
+    episode_dir: Optional[str] = None,
+    overlay_output_dir: Optional[str] = None,
+    task_id: Optional[str] = None,
     python_bin: str = sys.executable,
     track_cams: Optional[List[str]] = None,
     dry_run: bool = False,
@@ -340,13 +398,27 @@ def build_episode_command(
     batch_script = Path(repo_dir).expanduser() / "scripts" / "run_batch_object_overlay_with_env.py"
     if not batch_script.exists():
         batch_script = Path(repo_dir).expanduser() / "src" / "process" / "batch_object_overlay.py"
-    cmd = [
-        str(python_bin),
-        str(batch_script),
-        "--hand", hand,
-        "--obj", obj,
-        "--ep", episode,
-    ]
+    if batch_script.name == "run_batch_object_overlay_with_env.py" and episode_dir:
+        cmd = [
+            str(python_bin),
+            str(batch_script),
+            "--episode-dir", str(episode_dir),
+            "--hand", hand,
+            "--obj", obj,
+            "--ep", episode,
+        ]
+        if overlay_output_dir:
+            cmd.extend(["--overlay-output-dir", str(overlay_output_dir)])
+        if task_id:
+            cmd.extend(["--cache-key", str(task_id)])
+    else:
+        cmd = [
+            str(python_bin),
+            str(batch_script),
+            "--hand", hand,
+            "--obj", obj,
+            "--ep", episode,
+        ]
     if track_cams:
         cmd.extend(["--track-cams", *track_cams])
     if dry_run:
@@ -370,6 +442,9 @@ def run_episode_task(
         hand=str(task["hand"]),
         obj=str(task["obj"]),
         episode=str(task["episode"]),
+        episode_dir=str(task.get("episode_dir", "")),
+        overlay_output_dir=str(store.overlay_dir_for(task)),
+        task_id=task_id,
         python_bin=python_bin,
         track_cams=track_cams,
         dry_run=dry_run,

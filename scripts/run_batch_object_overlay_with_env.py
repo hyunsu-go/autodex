@@ -7,8 +7,11 @@ same script without editing it.
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import os
+import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -83,6 +86,111 @@ class _BatchSubprocessProxy:
         return self._module.Popen(cmd, *args, **kwargs)
 
 
+def _safe_cache_key(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_") or "episode"
+
+
+class _ProgressPrinter:
+    def __init__(self, stage: str):
+        self.stage = stage
+        self.total = None
+        self.current = 0
+
+    def reset(self, total=None):
+        self.total = total
+        self.current = 0
+
+    def set_postfix_str(self, *_args, **_kwargs):
+        return None
+
+    def update(self, delta):
+        self.current += int(delta)
+        total = int(self.total or max(self.current, 1))
+        pct = int((100 * self.current / total) if total else 0)
+        print(f"frames: {pct}%|direct| {self.current}/{total} {self.stage}", flush=True)
+
+
+def _parse_direct_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--episode-dir", required=True)
+    parser.add_argument("--overlay-output-dir", required=True)
+    parser.add_argument("--cache-key", default=None)
+    parser.add_argument("--hand", required=True)
+    parser.add_argument("--obj", required=True)
+    parser.add_argument("--ep", required=True)
+    parser.add_argument("--track-cams", nargs="+", default=None)
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args(argv)
+
+
+def _run_direct_episode(batch, argv: list[str]) -> int:
+    args = _parse_direct_args(argv)
+    nas_ep = Path(args.episode_dir).expanduser()
+    overlay_out = Path(args.overlay_output_dir).expanduser()
+    if not nas_ep.is_dir():
+        raise FileNotFoundError(f"episode dir not found: {nas_ep}")
+    videos_dir = nas_ep / "videos"
+    serials = sorted(p.stem for p in videos_dir.glob("*.avi")) if videos_dir.is_dir() else []
+    if not serials:
+        raise FileNotFoundError(f"no episode videos found: {videos_dir}")
+    print(f"=== direct episode {args.hand}/{args.obj}/{args.ep} cams={len(serials)} ===", flush=True)
+    print(f"[direct] episode_dir={nas_ep}", flush=True)
+    print(f"[direct] overlay_output_dir={overlay_out}", flush=True)
+    if args.dry_run:
+        print("[direct] dry_run_done", flush=True)
+        return 0
+
+    cache_key = _safe_cache_key(args.cache_key or str(nas_ep))
+    local_ep = batch.LOCAL_CACHE / "direct" / cache_key
+    local_gt_out = batch.LOCAL_CACHE / "gt_output" / "direct" / cache_key / "gotrack_output"
+    local_overlay_out = batch.LOCAL_CACHE / "overlay_output" / "direct" / cache_key
+    nas_gt_out = nas_ep / batch.GOTRACK_REL
+
+    do_gt = not batch.gotrack_done(nas_ep)
+    do_ov = not batch.overlay_done(overlay_out, serials)
+    if not (do_gt or do_ov):
+        print("[direct] skip existing outputs", flush=True)
+        return 0
+
+    if not batch._is_videos_cached(local_ep / "videos"):
+        print(f"[direct] downloading videos: {nas_ep}", flush=True)
+        batch.download_episode(nas_ep, local_ep)
+
+    try:
+        if do_gt:
+            ok = batch.run_gotrack(
+                local_ep,
+                nas_ep,
+                args.obj,
+                local_gt_out,
+                track_cams=args.track_cams,
+                frame_pbar=_ProgressPrinter("gotrack"),
+            )
+            if ok:
+                batch.upload_dir(local_gt_out, nas_gt_out)
+                shutil.rmtree(local_gt_out, ignore_errors=True)
+            else:
+                return 2
+
+        if do_ov and batch.gotrack_done(nas_ep):
+            ok = batch.run_overlay(
+                local_ep,
+                nas_ep,
+                args.obj,
+                local_overlay_out,
+                frame_pbar=_ProgressPrinter("overlay"),
+            )
+            if ok:
+                batch.upload_dir(local_overlay_out, overlay_out)
+                shutil.rmtree(local_overlay_out, ignore_errors=True)
+            else:
+                return 3
+
+        return 0
+    finally:
+        shutil.rmtree(local_ep, ignore_errors=True)
+
+
 def main() -> int:
     home = Path.home()
     batch = _load_batch_module()
@@ -113,6 +221,8 @@ def main() -> int:
     print(f"[env] FPOSE_PY={batch.FPOSE_PY}", flush=True)
     print(f"[env] AUTODEX_GOTRACK_FORWARD_PRECISION={gotrack_forward_precision}", flush=True)
     print(f"[env] LD_LIBRARY_PATH={os.environ.get('LD_LIBRARY_PATH', '')}", flush=True)
+    if "--episode-dir" in sys.argv[1:]:
+        return _run_direct_episode(batch, sys.argv[1:])
     batch.main()
     return 0
 
