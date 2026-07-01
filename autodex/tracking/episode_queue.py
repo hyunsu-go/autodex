@@ -276,6 +276,8 @@ class EpisodeScheduleStore:
             if status == "failed" and not retry_failed:
                 continue
             lock_dir = self.claim_dir(task_id)
+            if status == "failed" and retry_failed and lock_dir.exists():
+                shutil.rmtree(lock_dir, ignore_errors=True)
             try:
                 os.mkdir(lock_dir)
             except FileExistsError:

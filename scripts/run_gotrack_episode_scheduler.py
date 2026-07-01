@@ -108,6 +108,7 @@ def _launch(args: argparse.Namespace) -> int:
     schedule_dir = _schedule_dir(args)
     repo_dir = Path(args.repo_dir).expanduser()
     pcs: List[str] = list(args.pcs or DEFAULT_PCS)
+    ssh_tty_pcs = set(args.ssh_tty_pcs or [])
     log_dir = schedule_dir / "launcher_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     for pc in pcs:
@@ -129,7 +130,10 @@ def _launch(args: argparse.Namespace) -> int:
         quoted = " ".join(shlex.quote(x) for x in worker_cmd)
         remote_log = log_dir / f"{pc}.log"
         remote = f"cd {shlex.quote(str(repo_dir))} && nohup {quoted} > {shlex.quote(str(remote_log))} 2>&1 &"
-        ssh_cmd = ["ssh", pc, remote]
+        ssh_cmd = ["ssh"]
+        if pc in ssh_tty_pcs:
+            ssh_cmd.append("-tt")
+        ssh_cmd.extend([pc, remote])
         print("+ " + " ".join(shlex.quote(x) for x in ssh_cmd))
         if not args.dry_run:
             subprocess.run(ssh_cmd, check=True)
@@ -170,6 +174,8 @@ def main() -> int:
     p.add_argument("--python", default=sys.executable)
     p.add_argument("--pcs", nargs="+", default=DEFAULT_PCS)
     p.add_argument("--worker-id", default=None)
+    p.add_argument("--ssh-tty-pcs", nargs="+", default=None,
+                   help="With --mode launch, add -tt for PCs that require a TTY for SSH commands.")
     p.add_argument("--track-cams", nargs="+", default=None)
     p.add_argument("--once", action="store_true")
     p.add_argument("--retry-failed", action="store_true")
