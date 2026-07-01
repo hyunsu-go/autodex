@@ -166,13 +166,14 @@ git rev-list --left-right --count main...origin/main
 
 ## 4. 분배 단위 판단: episode vs object
 
-결론부터 말하면, live object tracking은 episode/object를 capture PC에 나누어
-맡기는 문제가 아니다. 한 trial의 한 frame을 추적하려면 5개 capture PC가 각자
-자기 카메라 frame을 동시에 처리해야 한다. 즉 live execution의 분배 단위는
+결론부터 말하면, live object tracking과 이미 저장된 video 후처리는 분배 단위가
+다르다. live object tracking은 episode/object를 capture PC에 나누어 맡기는
+문제가 아니다. 한 trial의 한 frame을 추적하려면 5개 capture PC가 각자 자기
+카메라 frame을 동시에 처리해야 한다. 즉 live execution의 분배 단위는
 camera-owner PC이고, 작업 단위는 "현재 trial tracking session"이다.
 
-다만 이미 저장된 video를 offline reprocessing하는 경우에는 episode 단위
-분배가 object 단위 분배보다 낫다.
+반대로 이미 저장된 video를 offline reprocessing하는 경우에는 episode 단위
+dynamic scheduling이 기본값으로 가장 적절하다.
 
 ### 4.1 Live tracking
 
@@ -190,7 +191,27 @@ camera-owner PC이고, 작업 단위는 "현재 trial tracking session"이다.
 ### 4.2 Offline reprocessing
 
 이미 저장된 video episode를 나중에 batch로 다시 돌리는 상황이라면 episode
-단위 queue가 낫다.
+단위 queue가 낫다. 이때 episode 단위 분배가 single-view tracking을 뜻하지는
+않는다. 각 worker는 자신이 claim한 episode의 모든 camera video를 함께 읽고,
+episode 내부에서는 여전히 multi-view GoTrack/fusion을 수행한다.
+
+권장 구조:
+
+```text
+shared episode queue
+  ├─ capture1 worker claims obj_a/ep_001
+  ├─ capture2 worker claims obj_a/ep_002
+  ├─ capture3 worker claims obj_b/ep_001
+  ├─ capture5 worker claims obj_c/ep_004
+  └─ capture6 worker claims obj_d/ep_003
+
+each worker:
+  load all views for one episode
+  run multi-view GoTrack
+  write world_pose_records.json
+  render overlay videos
+  mark episode done/failed/skipped
+```
 
 episode 단위 장점:
 
@@ -224,6 +245,10 @@ object 단위 단점:
 - offline tracking/overlay: episode 단위 queue를 기본으로 한다.
 - asset generation/onboarding: object 단위가 적합하다.
 
+2026-07-01 기준 구현은 이 판단을 반영해 offline용 episode-level dynamic
+scheduler를 별도 추가했다. live session wrapper는 유지하고, 저장된 video
+후처리는 새 scheduler를 사용한다.
+
 ## 5. 새 코드 추가 계획
 
 기존 `GoTrackEngine`, `gotrack_daemon`, `GoTrackTracker`, `run_auto.py`는
@@ -238,12 +263,21 @@ object 단위 단점:
 - `scripts/monitor_gotrack_progress.py`
 - `scripts/gotrack_progress_dashboard.py`
 - `scripts/run_gotrack_overlay_check.py`
+- `autodex/tracking/episode_queue.py`
+- `scripts/run_gotrack_episode_scheduler.py`
+- `scripts/gotrack_episode_dashboard.py`
 
 capture PC별 환경은 이미 구축되어 있다고 가정한다. 즉 conda env 설치,
 GoTrack checkpoint 배포, anchor bank 생성/동기화, AutoDex 코드 동기화는 이
 wrapper의 책임이 아니다. 이 구현은 이미 떠 있는 `gotrack_daemon`에 command를
 보내고, robot PC tracker output을 trial directory에 안정적으로 기록하는 데
 집중한다.
+
+offline 후처리에서는 `gotrack_daemon`을 사용하지 않는다. 대신
+`scripts/run_gotrack_episode_scheduler.py`가 shared schedule directory를 만들고,
+각 capture PC worker가 episode를 하나씩 claim한 뒤 기존
+`src/process/batch_object_overlay.py`를 episode 단위로 실행한다. 이 기존 batch
+worker는 episode 안의 모든 view를 읽어 multi-view GoTrack과 overlay를 수행한다.
 
 ### 5.1 `autodex/tracking/progress.py`
 
@@ -632,6 +666,57 @@ tracking output은 trial directory 아래에 바로 쓰는 것이 기본이다. 
 - heavy copy/rsync는 stop 후 background thread/process로 수행한다.
 - upload 시작/성공/실패를 `events.jsonl`와 `state.json.upload`에 기록한다.
 
+### 5.7 Offline episode-level dynamic scheduler
+
+이미 저장된 video 후처리는 아래 새 파일을 사용한다.
+
+- `autodex/tracking/episode_queue.py`
+  - shared filesystem 기반 queue/status store.
+  - task 단위는 `<hand>/<obj>/<episode>`.
+  - task claim은 `<schedule_dir>/claims/<task_id>.lock` directory를
+    `os.mkdir`로 만드는 방식이라 여러 worker가 동시에 접근해도 한 worker만
+    claim한다.
+  - task 상태는 `<schedule_dir>/tasks/<task_id>.json`에 저장된다.
+  - worker 상태는 `<schedule_dir>/workers/<worker_id>.json`에 저장된다.
+  - event log는 `<schedule_dir>/events.jsonl`에 append된다.
+- `scripts/run_gotrack_episode_scheduler.py`
+  - `--mode init`: 저장된 episode를 discover해 queue 생성.
+  - `--mode worker`: 한 PC에서 queue를 계속 claim하며 episode 처리.
+  - `--mode launch`: `capture1`, `capture2`, `capture3`, `capture5`,
+    `capture6`에 ssh로 worker 실행.
+  - `--mode status`: terminal에서 queue 요약 확인.
+- `scripts/gotrack_episode_dashboard.py`
+  - offline queue 전용 browser dashboard.
+  - queue summary, worker table, episode table, scheduler event log,
+    overlay playback을 보여준다.
+
+기존 `src/process/batch_object_overlay.py`는 그대로 재사용한다. scheduler worker는
+claim한 episode에 대해 아래와 같은 단일 episode command를 실행한다.
+
+```bash
+python src/process/batch_object_overlay.py \
+  --hand <hand> \
+  --obj <obj> \
+  --ep <episode>
+```
+
+이 command는 episode 안의 모든 camera video를 함께 사용해 GoTrack
+`world_pose_records.json`을 만들고, 이어서 camera serial별
+`overlay_<serial>.mp4`를 생성한다. 즉 분배 단위는 episode지만 tracking 자체는
+multi-view다.
+
+offline scheduler dashboard는 live dashboard와 구성이 다르다.
+
+- `Queue Summary`: 전체 episode 중 완료/진행/대기/실패 수와 ETA.
+- `Workers`: 각 capture PC worker가 어떤 episode를 처리 중인지.
+- `Episode Queue`: episode별 상태, stage, frame progress, overlay playback.
+- `Scheduler Events`: queue claim, task start/done/fail, worker start/stop log.
+
+이 구성은 live dashboard의 `Distributed Capture Health`와 다르다. offline에서는
+5개 PC가 같은 episode의 view를 나누어 처리하는 것이 아니라 서로 다른 episode를
+claim하므로, PC별 카메라 health보다 worker별 episode throughput과 queue ETA가
+핵심이다.
+
 ## 6. 결과 경로
 
 중요: 코드 repo는 `/home/robot/AutoDex`지만, 실험 결과 기본 저장 위치는
@@ -763,6 +848,30 @@ overlay 확인 결과는 별도 디렉터리에 저장된다.
 - `overlay_status.json`: overlay check 상태. 입력 video/record/cam_param, command, 생성된 mp4 목록.
 - `overlay_<camera_serial>.mp4`: 카메라별 mesh overlay 확인 영상.
 
+offline episode scheduler 상태는 별도 schedule directory에 저장된다.
+
+```text
+/home/robot/shared_data/AutoDex/object_tracking/episode_scheduler/<schedule_id>/
+```
+
+구체적인 파일:
+
+```text
+<schedule_dir>/manifest.json
+<schedule_dir>/events.jsonl
+<schedule_dir>/tasks/<hand>__<obj>__<episode>.json
+<schedule_dir>/claims/<hand>__<obj>__<episode>.lock/claim.json
+<schedule_dir>/workers/<worker_id>.json
+<schedule_dir>/logs/<task_id>.<worker_id>.log
+<schedule_dir>/launcher_logs/<worker_id>.log
+```
+
+offline overlay 결과는 기존 batch 코드 규약에 따라 아래에 저장된다.
+
+```text
+/home/robot/shared_data/AutoDex/object_overlay_video/<hand>/<obj>/<episode>/overlay_<camera_serial>.mp4
+```
+
 예를 들어 table scene에서 `exp_name=v7`, `hand=inspire_left`,
 `obj=pepsi_light`, `dir_idx=20260630_153012`라면 최종 overlay 입력 파일은
 아래다.
@@ -811,6 +920,47 @@ overlay check 실행 예:
 python scripts/run_gotrack_overlay_check.py \
   --trial-dir /home/robot/shared_data/AutoDex/experiment/v7/inspire_left/pepsi_light/20260630_153012 \
   --obj-name pepsi_light
+```
+
+offline episode scheduler 실행 예:
+
+```bash
+# 1. episode queue 생성
+python scripts/run_gotrack_episode_scheduler.py \
+  --mode init \
+  --hand inspire \
+  --obj pepsi_light tissue_box \
+  --schedule-id gotrack_inspire_20260701 \
+  --stages both
+
+# 2. 5개 capture PC에 worker launch
+python scripts/run_gotrack_episode_scheduler.py \
+  --mode launch \
+  --schedule-id gotrack_inspire_20260701 \
+  --pcs capture1 capture2 capture3 capture5 capture6 \
+  --repo-dir /home/robot/AutoDex
+
+# 3. terminal 상태 확인
+python scripts/run_gotrack_episode_scheduler.py \
+  --mode status \
+  --schedule-id gotrack_inspire_20260701
+
+# 4. offline queue dashboard
+python scripts/gotrack_episode_dashboard.py \
+  --schedule-dir /home/robot/shared_data/AutoDex/object_tracking/episode_scheduler/gotrack_inspire_20260701 \
+  --host 0.0.0.0 \
+  --port 8767
+```
+
+local에서 먼저 scheduler 동작만 검증하고 싶으면:
+
+```bash
+python scripts/run_gotrack_episode_scheduler.py \
+  --mode worker \
+  --schedule-id gotrack_inspire_20260701 \
+  --worker-id local-test \
+  --once \
+  --dry-run
 ```
 
 기본 video 탐색 순서:
