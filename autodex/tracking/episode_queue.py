@@ -276,8 +276,6 @@ class EpisodeScheduleStore:
             if status == "failed" and not retry_failed:
                 continue
             lock_dir = self.claim_dir(task_id)
-            if status == "failed" and retry_failed and lock_dir.exists():
-                shutil.rmtree(lock_dir, ignore_errors=True)
             try:
                 os.mkdir(lock_dir)
             except FileExistsError:
@@ -303,6 +301,22 @@ class EpisodeScheduleStore:
                        obj=task.get("obj"), episode=task.get("episode"))
             return task
         return None
+
+    def reset_failed_claims(self) -> int:
+        n_reset = 0
+        for task in self.tasks():
+            if str(task.get("status", "")) != "failed":
+                continue
+            task_id = str(task.get("task_id", ""))
+            if not task_id:
+                continue
+            lock_dir = self.claim_dir(task_id)
+            if lock_dir.exists():
+                shutil.rmtree(lock_dir, ignore_errors=True)
+                n_reset += 1
+        if n_reset:
+            self.event("failed_claims_reset", count=n_reset)
+        return n_reset
 
     def refresh_outputs(self, task: Dict[str, Any]) -> Dict[str, Any]:
         overlay_dir = self.overlay_dir_for(task)

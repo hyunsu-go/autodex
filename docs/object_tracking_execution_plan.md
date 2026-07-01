@@ -1337,7 +1337,8 @@ python scripts/run_gotrack_episode_scheduler.py \
   --ssh-tty-pcs capture1
 ```
 
-`--retry-failed`는 실패로 끝난 task의 오래된 claim lock을 제거한 뒤 다시 claim한다.
+`--retry-failed`는 launch 전에 실패로 끝난 task의 오래된 claim lock을 한 번만
+정리한 뒤 worker들이 다시 claim하게 한다.
 capture1처럼 non-TTY SSH command가 pre-auth 단계에서 reset되는 PC는
 `--ssh-tty-pcs`에 넣어 `ssh -tt`로 launch한다.
 

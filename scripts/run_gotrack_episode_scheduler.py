@@ -111,6 +111,11 @@ def _launch(args: argparse.Namespace) -> int:
     ssh_tty_pcs = set(args.ssh_tty_pcs or [])
     log_dir = schedule_dir / "launcher_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
+    if args.retry_failed:
+        store = EpisodeScheduleStore.open(schedule_dir)
+        n_reset = store.reset_failed_claims()
+        if n_reset:
+            print(f"reset {n_reset} failed claim lock(s)")
     for pc in pcs:
         worker_cmd = [
             args.python,
