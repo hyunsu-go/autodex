@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -28,6 +29,7 @@ GOTRACK_REL = Path("object_tracking") / "gotrack_output"
 
 GOTRACK_PROGRESS_RE = re.compile(r"gotrack_anchor_mv:\s*\d+%\|[^|]*\|\s*(\d+)/(\d+)")
 OVERLAY_PROGRESS_RE = re.compile(r"\[overlay_progress\]\s+(\d+)/(\d+)")
+TQDM_FRAME_PROGRESS_RE = re.compile(r"frames:\s+\d+%\|[^|]*\|\s*(\d+)/(\d+)")
 
 
 def safe_task_id(hand: str, obj: str, episode: str) -> str:
@@ -153,6 +155,8 @@ class EpisodeScheduleStore:
         schedule_dir = Path(schedule_root).expanduser() / schedule_id
         if schedule_dir.exists() and not force:
             raise FileExistsError(f"schedule already exists: {schedule_dir}")
+        if schedule_dir.exists() and force:
+            shutil.rmtree(schedule_dir)
         store = cls(
             schedule_dir=schedule_dir,
             experiment_root=experiment_root,
@@ -311,9 +315,12 @@ def build_episode_command(
     track_cams: Optional[List[str]] = None,
     dry_run: bool = False,
 ) -> List[str]:
+    batch_script = Path(repo_dir).expanduser() / "scripts" / "run_batch_object_overlay_with_env.py"
+    if not batch_script.exists():
+        batch_script = Path(repo_dir).expanduser() / "src" / "process" / "batch_object_overlay.py"
     cmd = [
         str(python_bin),
-        str(Path(repo_dir).expanduser() / "src" / "process" / "batch_object_overlay.py"),
+        str(batch_script),
         "--hand", hand,
         "--obj", obj,
         "--ep", episode,
@@ -369,6 +376,7 @@ def run_episode_task(
     env = dict(os.environ, PYTHONUNBUFFERED="1")
     last_phase = None
     last_progress = 0
+    failure_hint = None
     with open(log_path, "w", encoding="utf-8") as log_f:
         proc = subprocess.Popen(
             cmd,
@@ -395,6 +403,16 @@ def run_episode_task(
                 if m:
                     phase = "overlay"
                     done, total = int(m.group(1)), int(m.group(2))
+                else:
+                    m = TQDM_FRAME_PROGRESS_RE.search(stripped)
+                    if m:
+                        if " overlay" in stripped:
+                            phase = "overlay"
+                        elif " gotrack" in stripped:
+                            phase = "gotrack"
+                        else:
+                            phase = last_phase or "running"
+                        done, total = int(m.group(1)), int(m.group(2))
             if phase:
                 last_phase = phase
                 last_progress = done or 0
@@ -408,6 +426,9 @@ def run_episode_task(
                 store.write_task(task)
             elif stripped:
                 task["last_line"] = stripped[-300:]
+                if "[fail]" in stripped or "Traceback" in stripped or stripped.startswith("ModuleNotFoundError"):
+                    failure_hint = stripped[-300:]
+                    task["failure_hint"] = failure_hint
                 if last_phase:
                     task["phase"] = last_phase
                 store.write_task(task)
@@ -427,11 +448,15 @@ def run_episode_task(
         status = "failed"
         reason = f"returncode={proc.returncode}"
 
+    if status == "failed" and reason == "command_succeeded_but_outputs_missing" and failure_hint:
+        reason = f"{reason}: {failure_hint}"
+
     task.update({
         "status": status,
         "phase": "complete" if status == "done" else "failed",
         "returncode": int(proc.returncode),
         "reason": reason,
+        "failure_hint": failure_hint,
         "finished_at": finished,
         "runtime_sec": finished - started,
         "last_progress": last_progress,

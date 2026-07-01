@@ -323,6 +323,7 @@ const activeStatuses = new Set(['running', 'claimed']);
 const failedStatuses = new Set(['failed']);
 const fmtTime = ts => ts ? new Date(Number(ts) * 1000).toLocaleTimeString() : '-';
 const asNumber = value => {
+  if (value === undefined || value === null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
@@ -457,7 +458,7 @@ function workerSummaries(data, tasks, stats, now) {
     if (record.task_id) current = tasks.find(t => safe(t.task_id) === safe(record.task_id)) || null;
     if (!current) current = tasks.find(t => safe(t.worker_id) === id && activeStatuses.has(String(t.status || ''))) || null;
     const stat = stats.byWorker.get(id) || {done: 0, failed: 0, runtimeTotal: 0, runtimeCount: 0};
-    const workerAvg = stat.runtimeCount ? stat.runtimeTotal / stat.runtimeCount : stats.globalAvg;
+    const workerAvg = stat.runtimeCount ? stat.runtimeTotal / stat.runtimeCount : null;
     const updatedAt = asNumber(record.updated_at);
     const stale = updatedAt !== null && (now - updatedAt > 120) && (String(record.status || '') === 'running' || Boolean(current));
     const state = stale ? 'stale' : (record.status || (current ? 'running' : 'not_started'));
