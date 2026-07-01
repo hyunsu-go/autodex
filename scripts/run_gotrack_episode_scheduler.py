@@ -157,6 +157,7 @@ def _launch(args: argparse.Namespace) -> int:
             "set -eu",
             f"REPO={remote_repo}",
             f"SCHEDULE={remote_schedule}",
+            'export PATH="$HOME/anaconda3/bin:$HOME/miniconda3/bin:$PATH"',
             'mkdir -p "$SCHEDULE/launcher_logs"',
             'cd "$REPO"',
         ]
