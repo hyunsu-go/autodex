@@ -76,10 +76,10 @@ class _BatchSubprocessProxy:
             if existing:
                 paths.append(existing)
             env["PYTHONPATH"] = os.pathsep.join(paths)
-            env["AUTODEX_GOTRACK_BF16_AUTOCAST"] = "1"
+            env["AUTODEX_GOTRACK_BF16_XFORMERS"] = "1"
             env.setdefault("AUTODEX_GOTRACK_BF16_REQUIRED", "1")
             kwargs["env"] = env
-            print("[env] enabled GoTrack BF16 autocast shim", flush=True)
+            print("[env] enabled GoTrack BF16 xformers shim", flush=True)
         return self._module.Popen(cmd, *args, **kwargs)
 
 

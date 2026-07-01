@@ -1244,12 +1244,15 @@ requires device with capability <= (9, 0) but your GPU has capability (12, 0)
 
 - `scripts/run_batch_object_overlay_with_env.py`
   - 원본 `src/process/batch_object_overlay.py`는 수정하지 않는다.
-  - wrapper 내부에서 GoTrack tracking subprocess에만 BF16 `sitecustomize`
-    shim을 `PYTHONPATH`로 주입한다.
+  - wrapper 내부에서 GoTrack tracking subprocess에만 BF16 xformers
+    `sitecustomize` shim을 `PYTHONPATH`로 주입한다.
   - 기본값은 `AUTODEX_GOTRACK_FORWARD_PRECISION=bf16`이고, 필요 시 env var로
     override할 수 있다.
   - 현재 `run_multiview_gotrack_anchor_online.py`는 `--forward-precision` CLI를
     받지 않으므로 CLI 인자는 추가하지 않는다.
+  - global autocast는 pose tensor까지 BF16으로 만들어 `numpy()` 변환을 깨뜨릴 수
+    있으므로 사용하지 않는다. xformers attention 입력만 BF16으로 계산하고 출력은
+    FP32로 되돌린다.
 
 완료 판정 기준:
 
