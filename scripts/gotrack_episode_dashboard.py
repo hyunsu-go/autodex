@@ -19,7 +19,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from autodex.tracking.episode_queue import DEFAULT_PCS, EpisodeScheduleStore, summarize_schedule  # noqa: E402
+from autodex.tracking.episode_queue import (  # noqa: E402
+    DEFAULT_PCS,
+    EpisodeScheduleStore,
+    localize_shared_path,
+    overlay_done,
+    overlay_files,
+    summarize_schedule,
+)
 
 
 STAGE_DEFINITIONS = [
@@ -97,9 +104,43 @@ def _load_events(path: Path, limit: int = 40) -> List[Dict[str, Any]]:
     return out
 
 
+def _augment_overlay_metadata(store: EpisodeScheduleStore, data: Dict[str, Any]) -> None:
+    done_statuses = {"done", "skipped_done", "dry_run_done"}
+    tasks: List[Dict[str, Any]] = []
+    for task in data.get("tasks", []):
+        if not isinstance(task, dict):
+            continue
+        out = dict(task)
+        for key in ("episode_dir", "videos_dir"):
+            if out.get(key):
+                out[key] = str(localize_shared_path(out[key]))
+
+        overlay_dir = store.overlay_dir_for(out)
+        found: List[str] = []
+        for item in out.get("overlay_files", []) or []:
+            try:
+                path = localize_shared_path(item).resolve()
+            except OSError:
+                continue
+            if path.name.startswith("overlay_") and path.suffix.lower() == ".mp4" and path.is_file():
+                found.append(str(path))
+
+        if not found and str(out.get("status")) in done_statuses:
+            found = overlay_files(overlay_dir)
+
+        out["overlay_output_dir"] = str(overlay_dir)
+        out["overlay_files"] = sorted(set(found))
+        if out.get("serials"):
+            out["overlay_done"] = overlay_done(overlay_dir, out.get("serials", []))
+        tasks.append(out)
+
+    data["tasks"] = tasks
+
+
 def collect(schedule_dir: Path) -> Dict[str, Any]:
     store = EpisodeScheduleStore.open(schedule_dir)
     data = summarize_schedule(store)
+    _augment_overlay_metadata(store, data)
     data["events"] = _load_events(store.events_path)
     data["expected_pcs"] = list(DEFAULT_PCS)
     data["stage_definitions"] = STAGE_DEFINITIONS
@@ -389,6 +430,16 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
 .viewer video { width: 100%; max-height: 74vh; display: block; background: #000; }
 .viewer-nav { height: 54px; }
 .viewer-meta { padding: 8px 12px 10px; color: var(--muted); border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+select {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--text);
+  padding: 5px 28px 5px 8px;
+  font: inherit;
+}
 @media (max-width: 1200px) {
   .overview-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
   .risk-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
@@ -434,6 +485,20 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
 
   <div class="section-title">
     <div>
+      <h2>Completed Overlay Playback</h2>
+      <div class="sub" id="completedOverlayMeta">completed episodes with overlay videos</div>
+    </div>
+    <span class="sub" id="completedOverlayHint">latest first</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Object</th><th>Episode</th><th>Overlay Playback</th><th>Worker</th><th>Runtime</th><th>Output</th></tr></thead>
+      <tbody id="completedOverlayRows"><tr><td colspan="7" class="muted">loading</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">
+    <div>
       <h2>Stage Flow</h2>
       <div class="sub">episode lifecycle and current distribution</div>
     </div>
@@ -467,6 +532,15 @@ td.path { max-width: 420px; white-space: normal; overflow-wrap: anywhere; }
     <div>
       <h2>Episode Work Queue</h2>
       <div class="sub" id="queueMeta">tasks</div>
+    </div>
+    <div class="controls">
+      <select id="queueFilter" aria-label="Task queue filter">
+        <option value="active">Active + Pending</option>
+        <option value="playback">Completed With Overlay</option>
+        <option value="completed">All Completed</option>
+        <option value="failed">Failed</option>
+        <option value="all">All Tasks</option>
+      </select>
     </div>
   </div>
   <div class="table-wrap">
@@ -721,16 +795,61 @@ function renderStageFlow(data, tasks) {
   }).join('');
 }
 
+function taskRecency(task) {
+  return asNumber(task.finished_at) || asNumber(task.updated_at) || asNumber(task.started_at) || asNumber(task.created_at) || 0;
+}
+
+function sortTasks(tasks) {
+  const order = {running: 0, failed: 1, pending: 2, done: 3, skipped_done: 4, dry_run_done: 5};
+  return tasks.slice().sort((a, b) => {
+    const statusOrder = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+    if (statusOrder) return statusOrder;
+    const recent = taskRecency(b) - taskRecency(a);
+    if (recent) return recent;
+    return safe(a.obj).localeCompare(safe(b.obj)) || safe(a.episode).localeCompare(safe(b.episode));
+  });
+}
+
+function completedOverlayTasks(tasks) {
+  return tasks
+    .filter(t => doneStatuses.has(String(t.status || '')) && (t.overlay_files || []).length > 0)
+    .slice()
+    .sort((a, b) => taskRecency(b) - taskRecency(a) || safe(a.obj).localeCompare(safe(b.obj)) || safe(a.episode).localeCompare(safe(b.episode)));
+}
+
+function filterQueueTasks(tasks, mode) {
+  if (mode === 'all') return tasks;
+  if (mode === 'failed') return tasks.filter(t => failedStatuses.has(String(t.status || '')));
+  if (mode === 'completed') return tasks.filter(t => doneStatuses.has(String(t.status || '')));
+  if (mode === 'playback') return completedOverlayTasks(tasks);
+  return tasks.filter(t => activeStatuses.has(String(t.status || '')) || String(t.status || '') === 'pending');
+}
+
+function renderCompletedOverlay(tasks) {
+  const playback = completedOverlayTasks(tasks);
+  $('completedOverlayMeta').textContent = `${playback.length} completed episodes have overlay playback`;
+  $('completedOverlayHint').textContent = playback.length > 80 ? 'showing latest 80' : 'latest first';
+  $('completedOverlayRows').innerHTML = playback.length ? playback.slice(0, 80).map(t => {
+    const output = t.overlay_output_dir || '-';
+    return `<tr>
+      <td>${statusBadge(t.status || '-')}</td>
+      <td>${esc(t.obj)}</td>
+      <td class="mono">${esc(t.episode)}</td>
+      <td>${overlayCell(t)}</td>
+      <td class="mono">${esc(t.worker_id)}</td>
+      <td class="mono">${esc(t.runtime_sec ? fmtDuration(t.runtime_sec) : '-')}</td>
+      <td class="mono path">${esc(output)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="muted">no completed overlay videos found for this schedule</td></tr>';
+}
+
 function render(data) {
   lastData = data;
   overlayGroups = {};
   const manifest = data.manifest || {};
   const counts = data.counts || {};
   const now = asNumber(data.now) || Date.now() / 1000;
-  const tasks = (data.tasks || []).slice().sort((a, b) => {
-    const order = {running: 0, failed: 1, pending: 2, done: 3, skipped_done: 4, dry_run_done: 5};
-    return (order[a.status] ?? 9) - (order[b.status] ?? 9) || safe(a.obj).localeCompare(safe(b.obj)) || safe(a.episode).localeCompare(safe(b.episode));
-  });
+  const tasks = sortTasks(data.tasks || []);
   const done = Number(data.done_like || 0);
   const total = Number(data.n_tasks || tasks.length || 0);
   const pct = total ? clamp(100 * done / total, 0, 100) : 0;
@@ -761,6 +880,7 @@ function render(data) {
   $('overlayVideos').textContent = String(overlayFiles);
   $('overlayDetail').textContent = `${overlayEpisodes} episodes with playback`;
 
+  renderCompletedOverlay(tasks);
   renderStageFlow(data, tasks);
 
   $('workerMeta').textContent = `${workers.length} PCs · current-task ETA`;
@@ -788,8 +908,10 @@ function render(data) {
 
   renderRisks(tasks, workers, stats, manifest, now);
 
-  $('queueMeta').textContent = `${tasks.length} shown · sorted by active, failed, pending, done`;
-  $('taskRows').innerHTML = tasks.length ? tasks.slice(0, 160).map(t => {
+  const queueMode = $('queueFilter') ? $('queueFilter').value : 'active';
+  const queueTasks = filterQueueTasks(tasks, queueMode);
+  $('queueMeta').textContent = `${queueTasks.length}/${tasks.length} matched · showing first 160`;
+  $('taskRows').innerHTML = queueTasks.length ? queueTasks.slice(0, 160).map(t => {
     const status = t.status || '-';
     const output = t.overlay_output_dir || (t.episode_dir ? t.episode_dir + '/object_tracking/gotrack_output' : '-');
     const worker = safe(t.worker_id);
@@ -924,6 +1046,10 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape' && $('overlayViewer').classList.contains('open')) closeOverlayVideo();
   if (ev.key === 'ArrowLeft' && $('overlayViewer').classList.contains('open')) stepActiveOverlay(-1);
   if (ev.key === 'ArrowRight' && $('overlayViewer').classList.contains('open')) stepActiveOverlay(1);
+});
+
+$('queueFilter').addEventListener('change', () => {
+  if (lastData) render(lastData);
 });
 
 tick();
