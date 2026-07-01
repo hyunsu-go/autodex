@@ -366,6 +366,18 @@ tr:last-child td { border-bottom: 0; }
   grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 10px;
 }
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 10px;
+}
+.forecast-item {
+  min-height: 76px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
 .quality-item {
   min-height: 76px;
   padding: 10px;
@@ -373,9 +385,9 @@ tr:last-child td { border-bottom: 0; }
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-.quality-label { color: var(--muted); font-size: 12px; }
-.quality-value { margin-top: 6px; font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
-.quality-detail { color: var(--muted); margin-top: 5px; font-size: 12px; overflow-wrap: anywhere; }
+.quality-label, .forecast-label { color: var(--muted); font-size: 12px; }
+.quality-value, .forecast-value { margin-top: 6px; font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+.quality-detail, .forecast-detail { color: var(--muted); margin-top: 5px; font-size: 12px; overflow-wrap: anywhere; }
 .events {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -460,7 +472,7 @@ a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 @media (max-width: 900px) {
   .grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
-  .lifecycle, .quality-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  .lifecycle, .quality-grid, .forecast-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
   table { font-size: 12px; }
   th, td { padding: 7px 8px; }
   .event { grid-template-columns: 74px 1fr; }
@@ -503,6 +515,12 @@ a:hover { text-decoration: underline; }
       <div class="bar" style="margin-top:8px"><div id="ratioBar"></div></div>
     </div>
   </div>
+
+  <div class="section-title">
+    <h2>Runtime Forecast</h2>
+    <span class="sub" id="forecastMeta">requires max-frames or max-seconds for ETA</span>
+  </div>
+  <div class="forecast-grid" id="runtimeForecast"></div>
 
   <div class="section-title">
     <h2>Lifecycle</h2>
@@ -578,6 +596,21 @@ const fmtTime = ts => {
   const d = new Date(Number(ts) * 1000);
   return d.toLocaleTimeString();
 };
+const numberOrNull = v => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const fmtDuration = seconds => {
+  const s0 = numberOrNull(seconds);
+  if (s0 === null) return '-';
+  const s = Math.max(0, Math.round(s0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m ${String(r).padStart(2, '0')}s`;
+  return `${r}s`;
+};
 const esc = s => safe(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const donePhases = new Set(['done', 'ok', 'complete', 'skipped_done', 'dry_run_done']);
 const failedPhases = new Set(['failed', 'failed_no_pose_records', 'daemon_missing']);
@@ -648,6 +681,84 @@ function qualityItem(label, value, detail, clsName='') {
   </div>`;
 }
 
+function forecastItem(label, value, detail, clsName='') {
+  return `<div class="forecast-item ${clsName}">
+    <div class="forecast-label">${esc(label)}</div>
+    <div class="forecast-value">${esc(value)}</div>
+    <div class="forecast-detail">${esc(detail)}</div>
+  </div>`;
+}
+
+function targetText(limits) {
+  const maxFrames = numberOrNull(limits.max_frames);
+  const maxSeconds = numberOrNull(limits.max_seconds);
+  const parts = [];
+  if (maxFrames !== null && maxFrames > 0) parts.push(`${maxFrames} frames`);
+  if (maxSeconds !== null && maxSeconds > 0) parts.push(fmtDuration(maxSeconds));
+  return parts.length ? parts.join(' or ') : 'external stop';
+}
+
+function computeForecast(data, ok, phase) {
+  const st = data.state || {};
+  const summary = data.summary || {};
+  const manifest = data.manifest || {};
+  const limits = st.limits || manifest.limits || {};
+  const now = numberOrNull(data.now) ?? Date.now() / 1000;
+  const startedAt = numberOrNull(st.started_at) ?? numberOrNull(manifest.created_at) ?? numberOrNull(summary.started_at);
+  const finishedAt = numberOrNull(summary.finished_at) ?? numberOrNull(st.finished_at);
+  const terminal = donePhases.has(String(phase || '')) || failedPhases.has(String(phase || ''));
+  const effectiveNow = terminal && finishedAt !== null ? finishedAt : now;
+  const elapsed = startedAt !== null ? Math.max(0, effectiveNow - startedAt) : null;
+  const maxFrames = numberOrNull(limits.max_frames);
+  const maxSeconds = numberOrNull(limits.max_seconds);
+  const frameTarget = maxFrames !== null && maxFrames > 0 ? maxFrames : null;
+  const timeTarget = maxSeconds !== null && maxSeconds > 0 ? maxSeconds : null;
+  const fps = numberOrNull(st.fps) ?? numberOrNull(summary.throughput_success_fps) ?? null;
+  const measuredRate = elapsed !== null && elapsed > 0 && ok > 0 ? ok / elapsed : null;
+  const rate = fps !== null && fps > 0 ? fps : measuredRate;
+
+  const remainingFrames = frameTarget !== null ? Math.max(0, frameTarget - ok) : null;
+  const frameEta = remainingFrames !== null && rate !== null && rate > 0 ? remainingFrames / rate : null;
+  const timeRemaining = timeTarget !== null && elapsed !== null ? Math.max(0, timeTarget - elapsed) : null;
+  const candidates = [frameEta, timeRemaining].filter(v => v !== null);
+  const remaining = terminal ? 0 : (candidates.length ? Math.min(...candidates) : null);
+  const progressByFrame = frameTarget !== null ? Math.max(0, Math.min(100, 100 * ok / frameTarget)) : null;
+  const progressByTime = timeTarget !== null && elapsed !== null ? Math.max(0, Math.min(100, 100 * elapsed / timeTarget)) : null;
+  const progressCandidates = [progressByFrame, progressByTime].filter(v => v !== null);
+  const progress = terminal ? 100 : (progressCandidates.length ? Math.max(...progressCandidates) : null);
+
+  return {
+    limits,
+    terminal,
+    elapsed,
+    remaining,
+    frameTarget,
+    timeTarget,
+    remainingFrames,
+    rate,
+    progress,
+  };
+}
+
+function renderForecast(data, ok, phase) {
+  const fc = computeForecast(data, ok, phase);
+  const target = targetText(fc.limits);
+  const etaValue = fc.remaining === null ? (fc.terminal ? '0s' : 'open-ended') : fmtDuration(fc.remaining);
+  const etaDetail = fc.remaining === null
+    ? 'set --max-frames or --max-seconds for ETA'
+    : (fc.terminal ? 'run finished' : 'estimated from current FPS/elapsed time');
+  const rateValue = fc.rate !== null && fc.rate > 0 ? fc.rate.toFixed(2) + ' fps' : '-';
+  const progressValue = fc.progress !== null ? fc.progress.toFixed(1) + '%' : '-';
+  const remainingFrames = fc.remainingFrames === null ? '-' : String(fc.remainingFrames);
+  $('forecastMeta').textContent = 'target ' + target;
+  $('runtimeForecast').innerHTML = [
+    forecastItem('Elapsed', fmtDuration(fc.elapsed), fc.terminal ? 'final runtime' : 'since session start'),
+    forecastItem('Remaining ETA', etaValue, etaDetail),
+    forecastItem('Target Progress', progressValue, `target: ${target}`),
+    forecastItem('Throughput', rateValue, `remaining frames: ${remainingFrames}`),
+  ].join('');
+}
+
 function overlayCell(r) {
   const files = (r.overlay_files || []).filter(f => f && f.path);
   const status = r.overlay_status || (files.length ? 'ok' : '-');
@@ -716,6 +827,7 @@ function render(data) {
   $('lastframe').textContent = 'last frame ' + safe(st.last_frame_id ?? summary.last_frame_index);
   $('ratio').textContent = received > 0 ? ratio.toFixed(1) + '%' : '-';
   $('ratioBar').style.width = Math.max(0, Math.min(100, ratio)) + '%';
+  renderForecast(data, ok, phase);
   renderLifecycle(phase, overlayStatus);
 
   const pcUpdated = (data.pc_status || {}).updated_at;

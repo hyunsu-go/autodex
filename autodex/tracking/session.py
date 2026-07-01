@@ -614,6 +614,13 @@ class GoTrackTrackingSession:
             "anchor_bank_path": str(self.cfg.anchor_bank_path),
             "init_pose_npy": str(self.cfg.init_pose_npy),
             "cam_param_dir": str(self.cfg.cam_param_dir),
+            "limits": {
+                "min_cams_per_frame": int(self.cfg.min_cams_per_frame),
+                "max_frames": int(self.cfg.max_frames),
+                "max_seconds": float(self.cfg.max_seconds),
+                "progress_interval_s": float(self.cfg.progress_interval_s),
+                "stale_after_s": float(self.cfg.stale_after_s),
+            },
         }
         self.store = TrackingProgressStore(out_dir, manifest=manifest)
         self._pc_status = self._initial_pc_status()
@@ -626,6 +633,7 @@ class GoTrackTrackingSession:
             trial_dir=str(self.cfg.trial_dir),
             expected_pcs=list(self.cfg.pc_list),
             capture_ips=list(self.capture_ips),
+            limits=dict(manifest["limits"]),
             upload={"status": "not_started"},
         )
 

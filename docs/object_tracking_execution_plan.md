@@ -458,6 +458,40 @@ python scripts/gotrack_progress_dashboard.py \
 로컬 브라우저에서 열면 된다. 같은 네트워크의 다른 장비에서 보려면
 `--host 0.0.0.0`로 띄운 뒤 `http://<robot-pc-ip>:8766/`에 접속한다.
 
+SSH tunnel로 안전하게 보는 방법:
+
+```bash
+# local laptop에서 실행
+ssh -L 8766:127.0.0.1:8766 robot@<robot-pc-ip>
+
+# robot PC shell에서 실행
+python scripts/gotrack_progress_dashboard.py \
+  --trial-dir <trial_dir> \
+  --host 127.0.0.1 \
+  --port 8766
+```
+
+그 다음 local browser에서 아래 주소를 연다.
+
+```text
+http://127.0.0.1:8766/
+```
+
+이 file-based dashboard가 권장 실시간 창이다. `run_gotrack_session.py`의
+`--web-port`는 `GoTrackTracker` process 내부 상태를 보여주는 보조 dashboard라서
+process가 죽으면 상태가 사라진다. 반면 `scripts/gotrack_progress_dashboard.py`는
+`state.json`, `capture_pc_status.json`, `runs_latest.json`, `events.jsonl`을
+읽기 때문에 run 종료 후에도 완료 상태와 overlay playback을 계속 볼 수 있다.
+
+ETA 표시 규칙:
+
+- `--max-frames N`: 현재 성공 pose 수와 tracker FPS를 기준으로 남은 frame과
+  ETA를 계산한다.
+- `--max-seconds S`: 시작 시각과 목표 runtime 기준으로 남은 시간을 계산한다.
+- 둘 다 지정된 경우 먼저 도달할 조건을 기준으로 ETA를 표시한다.
+- 둘 다 없으면 live tracking은 외부 stop 또는 실험 종료 이벤트에 의해 끝나므로
+  남은 시간은 `open-ended`로 표시한다.
+
 daemon과 tracking runtime을 건드리지 않는 입력 검증 dry-run:
 
 ```bash
@@ -546,6 +580,10 @@ output: .../object_tracking/gotrack_output/world_pose_records.json
 - `Current Run Snapshot`: 지금 선택한 run 하나의 대표 상태만 보여준다. object,
   episode/trial, phase, pose record 수, tracker FPS, fit success ratio가 여기에
   들어간다.
+- `Runtime Forecast`: 현재 run의 elapsed time, 남은 ETA, 목표 대비 진행률,
+  throughput을 보여준다. `--max-frames` 또는 `--max-seconds`가 지정된 run은
+  목표 기반 ETA를 계산하고, 둘 다 없는 live run은 외부 stop 대기 상태이므로
+  `open-ended`로 표시한다.
 - `Lifecycle`: preflight, daemon init, tracking, overlay, complete 순서 중 현재
   run이 어디까지 진행됐는지 보여준다. 이것은 stage 관점이고, frame/PC 세부
   상태와 분리한다.
@@ -570,9 +608,9 @@ Run History의 `Overlay` 컬럼은 단순 상태 표시가 아니라, 각 run의
 해당 MP4를 stream한다. 임의 파일을 열지 않도록 이 endpoint는 dashboard가 현재
 run history에서 발견한 `overlay_*.mp4`만 허용한다.
 
-추가로 더 체계적인 시각화를 위해 1차로 `Lifecycle` strip과 capture PC별
-`Frame Share` bar를 넣었다. 이후 실제 run 로그가 충분히 쌓이면 다음 요소를
-추가할 수 있다.
+추가로 더 체계적인 시각화를 위해 1차로 `Runtime Forecast`, `Lifecycle` strip,
+capture PC별 `Frame Share` bar를 넣었다. 이후 실제 run 로그가 충분히 쌓이면
+다음 요소를 추가할 수 있다.
 
 - PC별 frame lag timeline: 어느 capture PC가 언제부터 늦어졌는지 확인.
 - residual trend chart: pose fit residual이 시간에 따라 drift하는지 확인.
