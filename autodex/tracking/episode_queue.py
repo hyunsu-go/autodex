@@ -16,7 +16,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from autodex.tracking.progress import append_jsonl, atomic_write_json, utc_ts
 
@@ -49,6 +49,15 @@ def load_json(path: Path, default: Any) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return default
+
+
+def localize_shared_path(path: Union[str, Path]) -> Path:
+    """Map /home/<other-user>/shared_data paths to this host's home."""
+    p = Path(path).expanduser()
+    parts = p.parts
+    if len(parts) >= 5 and parts[0] == "/" and parts[1] == "home" and parts[3] == "shared_data":
+        return Path.home() / "shared_data" / Path(*parts[4:])
+    return p
 
 
 def gotrack_done(episode_dir: Path) -> bool:
@@ -238,11 +247,11 @@ class EpisodeScheduleStore:
         manifest = load_json(Path(schedule_dir).expanduser() / "manifest.json", {})
         return cls(
             schedule_dir=Path(schedule_dir).expanduser(),
-            experiment_root=Path(os.environ.get(
+            experiment_root=localize_shared_path(os.environ.get(
                 "AUTODEX_EXPERIMENT_ROOT",
                 manifest.get("experiment_root", DEFAULT_EXPERIMENT_ROOT),
             )),
-            overlay_root=Path(os.environ.get(
+            overlay_root=localize_shared_path(os.environ.get(
                 "AUTODEX_OVERLAY_ROOT",
                 manifest.get("overlay_root", DEFAULT_OVERLAY_ROOT),
             )),
@@ -376,7 +385,7 @@ class EpisodeScheduleStore:
     def refresh_outputs(self, task: Dict[str, Any]) -> Dict[str, Any]:
         overlay_dir = self.overlay_dir_for(task)
         task = dict(task)
-        task["gotrack_done"] = gotrack_done(Path(task["episode_dir"]))
+        task["gotrack_done"] = gotrack_done(localize_shared_path(task["episode_dir"]))
         task["overlay_done"] = overlay_done(overlay_dir, task.get("serials", []))
         task["overlay_output_dir"] = str(overlay_dir)
         task["overlay_files"] = overlay_files(overlay_dir)
@@ -442,7 +451,7 @@ def run_episode_task(
         hand=str(task["hand"]),
         obj=str(task["obj"]),
         episode=str(task["episode"]),
-        episode_dir=str(task.get("episode_dir", "")),
+        episode_dir=str(localize_shared_path(str(task.get("episode_dir", "")))),
         overlay_output_dir=str(store.overlay_dir_for(task)),
         task_id=task_id,
         python_bin=python_bin,
