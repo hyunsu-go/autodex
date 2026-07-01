@@ -1254,6 +1254,15 @@ requires device with capability <= (9, 0) but your GPU has capability (12, 0)
     있으므로 사용하지 않는다. xformers attention 입력만 BF16으로 계산하고 출력은
     FP32로 되돌린다.
 
+- `scripts/setup_object_overlay_env.sh`
+  - overlay rendering은 GoTrack env가 아니라 보통 `~/anaconda3/envs/paradex`를
+    사용한다.
+  - `overlay_object_video_single.py`에는 `transforms3d`, `trimesh`,
+    `nvdiffrast`가 필요하다.
+  - 2026-07-01 smoke test에서 GoTrack은 완료됐지만 overlay가
+    `ModuleNotFoundError: transforms3d` 또는 `ModuleNotFoundError: trimesh`로
+    실패했으므로, capture PC마다 이 스크립트로 overlay env를 별도 검증한다.
+
 완료 판정 기준:
 
 ```text
@@ -1275,6 +1284,12 @@ bash scripts/setup_gotrack_blackwell_xformers.sh --verify-only
 
 ```bash
 bash scripts/setup_gotrack_blackwell_xformers.sh
+```
+
+한 PC에서 overlay env 검증/설치:
+
+```bash
+bash scripts/setup_object_overlay_env.sh
 ```
 
 5개 capture PC에 한 번씩만 SSH로 launch:
@@ -1354,4 +1369,23 @@ python scripts/gotrack_episode_dashboard.py \
   --schedule-dir /home/robot/shared_data/AutoDex/object_tracking/episode_scheduler/gotrack_5pc_banana_20260701 \
   --host 0.0.0.0 \
   --port 8768
+```
+
+2026-07-01 실제 5-PC banana smoke test 결과:
+
+```text
+schedule: /home/robot/shared_data/AutoDex/object_tracking/episode_scheduler/gotrack_5pc_banana_20260701
+episodes: 5/5 done
+object: allegro/banana
+episodes:
+  20260405_073417
+  20260405_073554
+  20260405_073727
+  20260405_073843
+  20260405_074229
+outputs:
+  /home/robot/shared_data/AutoDex/experiment/selected_100/allegro/banana/<episode>/object_tracking/gotrack_output/world_pose_records.json
+  /home/robot/shared_data/AutoDex/object_overlay_video/allegro/banana/<episode>/overlay_<serial>.mp4
+overlay files: 24 per episode
+dashboard: http://127.0.0.1:8769/
 ```
